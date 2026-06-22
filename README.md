@@ -1,0 +1,2 @@
+# benchmarking-tree
+El proyecto consiste en construir índices externos e independientes sobre la columna `ID` del **Financial Transactions Dataset: Analytics** (Kaggle), mapeando cada clave a su posición física (`offset` en bytes) dentro del archivo CSV original, el cual permanece inalterado.   Se realiza una prueba de estrés realizando **10,000 búsquedas aleatorias** sobre cuatro arquitecturas de indexación diferentes para analizar tiempos de respuesta, eficiencia espacial y comportamiento bajo carga masiva. 

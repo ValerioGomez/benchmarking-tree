@@ -56,8 +56,10 @@ El proyecto está organizado de la siguiente manera:
 ├── src/                        # Código fuente del proyecto (C++)
 │   ├── main.cpp                # Ejecutable principal y suite de pruebas (Benchmarking)
 │   ├── indexer/                # Lógica de lectura de offsets y mapeo del CSV
-│   ├── b_star_tree/            # Árbol B* tradicional y su versión optimizada con ML
-│   └── skip_list/              # Skip List tradicional y optimizada con Regresión
+│   ├── b_star_tree_traditional/ # Árbol B* tradicional (Línea Base)
+│   ├── b_star_tree_ml/         # Árbol B* + Machine Learning (Learned Index)
+│   ├── skip_list_traditional/  # Skip List tradicional (Línea Base)
+│   └── skip_list_ml/           # Skip List + Machine Learning (Learned Skip List)
 │
 ├── data/                       # Carpeta contenedora del dataset e índices (Excluida en .gitignore)
 │   └── README.md               # Instrucciones para descargar transactions_data.csv
@@ -145,18 +147,42 @@ Para la entrega y aprobación final del trabajo doctoral, el equipo deberá cons
 ---
 
 ## ⚙️ Requisitos y Ejecución
-### Prerrequisitos
+
+### Opción A: Ejecución con Docker (Recomendado para Reproducibilidad)
+
+El proyecto incluye un entorno Docker pre-configurado que garantiza que la compilación de C++ y la suite de pruebas se ejecuten de manera idéntica en cualquier sistema operativo, eliminando discrepancias de compiladores locales.
+
+#### Prerrequisitos:
+* Tener instalado [Docker](https://www.docker.com/) y [Docker Compose](https://docs.docker.com/compose/).
+* Descargar el dataset [Financial Transactions Dataset: Analytics (Transactions Fraud Datasets)](https://www.kaggle.com/datasets/computingvictor/transactions-fraud-datasets/data?select=transactions_data.csv) de Kaggle y colocar el archivo `transactions_data.csv` en la carpeta `data/`.
+
+#### Pasos para ejecutar:
+1. **Construir la imagen**:
+   ```bash
+   docker-compose build
+   ```
+2. **Ejecutar el benchmark**:
+   ```bash
+   docker-compose run --rm benchmark
+   ```
+   *(Esto ejecutará la compilación optimizada en un contenedor basado en GCC, leerá el CSV desde tu carpeta local `data/` mediante el volumen montado, y generará los índices `.idx` correspondientes).*
+
+---
+
+### Opción B: Compilación Local Tradicional
+
+#### Prerrequisitos:
 * Compilador de C++ (compatible con C++17 o superior, p. ej., `g++` o `clang`).
 * Entorno para compilar LaTeX (como `pdflatex` o `TeX Live`) si deseas regenerar el PDF del informe.
-* Python 3 (opcional, en caso de usar scripts auxiliares para el entrenamiento inicial de los modelos).
+* Python 3 (opcional, en caso de usar scripts auxiliares para el entrenamiento de los modelos).
 
-### Instrucciones Rápidas
-1. Descarga el dataset [Financial Transactions Dataset: Analytics (Transactions Fraud Datasets)](https://www.kaggle.com/datasets/computingvictor/transactions-fraud-datasets/data?select=transactions_data.csv) de Kaggle y colócalo en la carpeta `data/` con el nombre `transactions_data.csv`.
-2. Compila el código fuente:
+#### Instrucciones Rápidas:
+1. Descarga el dataset de Kaggle y colócalo en la carpeta `data/` con el nombre `transactions_data.csv`.
+2. Compila el código fuente localmente:
    ```bash
    g++ -O3 -std=c++17 src/main.cpp -o benchmark_indexes
    ```
-3. Ejecuta el benchmark para construir los índices y correr las 10,000 pruebas:
+3. Ejecuta el benchmark:
    ```bash
    ./benchmark_indexes
    ```

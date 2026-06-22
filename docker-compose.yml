@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  benchmark:
+    build: .
+    container_name: learned_indexes_benchmark
+    volumes:
+      # Monta la carpeta data del host para leer el CSV y escribir los índices .idx
+      - ./data:/app/data
+      # Monta la carpeta de análisis para registrar métricas o reportes de salida
+      - ./analysis:/app/analysis
+    stdin_open: true
+    tty: true

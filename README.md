@@ -107,7 +107,7 @@ El artículo de investigación final se encuentra en la carpeta `/paper` y sigue
 * Python 3 (opcional, en caso de usar scripts auxiliares para el entrenamiento inicial de los modelos).
 
 ### Instrucciones Rápidas
-1. Descarga el dataset de Kaggle y colócalo en la carpeta `data/` con el nombre `transactions_data.csv`.
+1. Descarga el dataset [Financial Transactions Dataset: Analytics (Transactions Fraud Datasets)](https://www.kaggle.com/datasets/computingvictor/transactions-fraud-datasets/data?select=transactions_data.csv) de Kaggle y colócalo en la carpeta `data/` con el nombre `transactions_data.csv`.
 2. Compila el código fuente:
    ```bash
    g++ -O3 -std=c++17 src/main.cpp -o benchmark_indexes

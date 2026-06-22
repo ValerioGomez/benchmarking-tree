@@ -90,13 +90,52 @@ Los resultados detallados de los tiempos de ejecución para las 10,000 búsqueda
 
 ---
 
-## 📝 Entregable Académico
-El artículo de investigación final se encuentra en la carpeta `/paper` y sigue estrictamente la estructura editorial de un paper científico:
-* **Introducción:** Contexto de los Learned Indexes en la era del Big Data.
-* **Metodología:** Explicación del modelado predictivo aplicado a Árboles B* y Skip Lists.
-* **Pruebas y Resultados:** Análisis cuantitativo de los tiempos de respuesta.
-* **Conclusiones:** Discusión sobre el balance entre el costo de entrenamiento del modelo vs. velocidad de búsqueda.
-* **Referencias:** Bibliografía de soporte sobre estructuras de datos avanzadas.
+## 📝 Entregables del Proyecto
+
+Para la entrega y aprobación final del trabajo doctoral, el equipo deberá consolidar:
+1. **Código Fuente Completo (C++17)**:
+   * Implementación limpia, modular y optimizada de las 4 arquitecturas dentro de la carpeta `src/`.
+   * Suite de pruebas automatizada en `src/main.cpp` capaz de medir y reportar tiempos en microsegundos.
+2. **Archivos de Índices Desacoplados**:
+   * Archivos externos `.idx` generados en disco que almacenen el mapa `(ID, offset)` sin modificar el archivo original de 1.26 GB.
+3. **Análisis Estadístico Comparativo**:
+   * Archivo Excel `analysis/metrics_results.xlsx` con los datos consolidados de las búsquedas (media, varianza, desviación estándar) y gráficos de barras/cajas.
+4. **Artículo Científico en LaTeX**:
+   * Artículo final redactado según el formato estándar IEEE en `paper/main.tex` y compilado como `paper/report_final.pdf`.
+
+---
+
+## 📅 Roadmap y Plan de Trabajo (Instrucciones para el Equipo)
+
+Para avanzar ordenadamente en el desarrollo de la investigación, seguiremos las siguientes fases de implementación distribuyendo las tareas del equipo:
+
+### 🔹 Fase 1: Extracción de Offsets y Serialización (`src/indexer/`)
+* **Objetivo**: Mapear la ubicación en bytes (`offset`) de cada registro en el CSV inmutable basándonos en su columna `ID`.
+* **Instrucciones**:
+  * Descargar el dataset e inicializar `data/transactions_data.csv`.
+  * Diseñar un cargador en C++ que recorra el archivo CSV secuencialmente una sola vez y extraiga el par `(Transaction_ID, Offset_Bytes)`.
+  * Serializar este mapa en un archivo binario `.idx` rápido de cargar en memoria en subsecuentes ejecuciones para evitar re-parsear los 1.26 GB de datos.
+
+### 🔹 Fase 2: Desarrollo de las Estructuras Tradicionales (Líneas Base)
+* **Objetivo**: Implementar los algoritmos de búsqueda tradicionales.
+* **Instrucciones**:
+  * **Árbol B\* Tradicional (`src/b_star_tree/`)**: Diseñar la estructura jerárquica asegurando una densidad de nodos del $2/3$.
+  * **Skip List Tradicional (`src/skip_list/`)**: Crear la lista probabilística estándar guiando la inserción y niveles con una distribución geométrica (azar).
+  * Ambos índices deben poblarse usando el mapa de offsets previamente serializado.
+
+### 🔹 Fase 3: Integración de Machine Learning (Learned Indexes)
+* **Objetivo**: Reemplazar y optimizar los recorridos y saltos tradicionales con modelos de regresión entrenados.
+* **Instrucciones**:
+  * **Árbol B\* + ML**: Entrenar un modelo de predicción (p. ej., regresión lineal segmentada) sobre la función de distribución acumulada (CDF) de los IDs para predecir la página física de búsqueda con un error $\Delta$. Luego, realizar una búsqueda binaria local limitada.
+  * **Skip List + ML**: Diseñar un estimador estadístico (regresión lineal o logística) que analice la densidad de claves locales para asignar predictivamente la altura de cada nodo de forma matemática en lugar de probabilística aleatoria.
+
+### 🔹 Fase 4: Suite de Benchmarking e Informe Científico
+* **Objetivo**: Ejecutar pruebas de estrés uniformes y documentar los hallazgos académicamente.
+* **Instrucciones**:
+  * En `src/main.cpp`, estructurar la suite de pruebas que lance **10,000 consultas aleatorias** idénticas sobre las 4 variantes de índice, midiendo la latencia exacta de cada una.
+  * Exportar los tiempos, varianzas y desviación estándar a `analysis/metrics_results.xlsx`.
+  * Redactar y compilar el paper académico en `paper/main.tex` utilizando LaTeX, detallando la metodología, comparando gráficamente los tiempos de latencia y discutiendo la relación entre costo de entrenamiento vs. velocidad de consulta.
+
 
 ---
 

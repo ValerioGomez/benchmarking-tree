@@ -107,7 +107,12 @@ Para la entrega y aprobación final del trabajo doctoral, el equipo deberá cons
 
 ## 📅 Roadmap y Plan de Trabajo (Instrucciones para el Equipo)
 
-Para avanzar ordenadamente en el desarrollo de la investigación, seguiremos las siguientes fases de implementación distribuyendo las tareas del equipo:
+### 🔹 Fase 0: Búsqueda y Revisión de Literatura (Web of Science / Scopus)
+* **Objetivo**: Recopilar y analizar artículos de alto impacto indexados en Web of Science (WoS) y Scopus relacionados con *Learned Indexes* y optimización de *Skip Lists* mediante ML.
+* **Instrucciones**:
+  * Buscar papers científicos clave sobre estructuras de datos aprendidas e importar los PDFs a la carpeta `literature/`.
+  * Documentar y estructurar la bibliografía inicial en formato BibTeX en el archivo `paper/references.bib`.
+  * Redactar la sección de introducción y trabajos relacionados en el borrador del paper (`paper/main.tex`).
 
 ### 🔹 Fase 1: Extracción de Offsets y Serialización (`src/indexer/`)
 * **Objetivo**: Mapear la ubicación en bytes (`offset`) de cada registro en el CSV inmutable basándonos en su columna `ID`.

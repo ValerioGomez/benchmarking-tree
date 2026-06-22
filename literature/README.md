@@ -24,7 +24,20 @@ Esta carpeta está destinada a almacenar artículos científicos (papers), enlac
 
 ---
 
+## 🔍 Criterios de Búsqueda y Fuentes de Datos (Scopus & WoS)
+
+Para el desarrollo del marco teórico y el estado del arte de la investigación doctoral, el equipo utilizará las siguientes bases de datos indexadas de alto impacto:
+* **Scopus** (Elsevier)
+* **Web of Science (WoS)** (Clarivate)
+
+### Ecuaciones de Búsqueda Sugeridas:
+* `TITLE-ABS-KEY("Learned Index" OR "Learned Indexes" AND "B-Tree")`
+* `TITLE-ABS-KEY("Learned Skip List" OR "Learned" AND "Skip List" AND "Regression")`
+* `TITLE-ABS-KEY("index optimization" AND "machine learning" AND "database index")`
+
+---
+
 ## 🗂️ Organización de la Carpeta
 
-* Coloque los PDFs de los artículos en esta carpeta (`literature/`).
-* Registre las referencias bibliográficas correspondientes en el archivo BibTeX (`paper/references.bib`) para la compilación del paper final en LaTeX.
+* **PDFs**: Coloque los artículos científicos clave en formato PDF en este directorio (`literature/`).
+* **Citas**: Registre las referencias bibliográficas correspondientes en formato BibTeX en el archivo [references.bib](file:///c:/Users/vales/Documents/GitHub/benchmarking-tree/paper/references.bib) para la compilación en LaTeX.

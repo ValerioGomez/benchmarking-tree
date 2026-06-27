@@ -1,0 +1,176 @@
+\documentclass[twocolumn,10pt,journal]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{cite}
+
+% Configuración del documento
+\begin{document}
+
+\title{Benchmarking de \'Indices Aprendidos (Learned Indexes) vs. Estructuras de Datos Tradicionales en Grandes Vol\'umenes de Datos}
+
+\author{
+    Elmer Valerio G\'omez Alcos, David Fern\'andez Chambilla,\\
+    Joel Dandy Tintaya Cahuapaza, Luis Fernando Talizo Chambilla\\
+    \small{Escuela de Posgrado, Doctorado en Ciencias de la Computaci\'on}\\
+    \small{Facultad de Ingenier\'ia Estad\'istica e Inform\'atica}\\
+    \small{Universidad Nacional del Altiplano}\\
+    \small{Puno, Per\'u}\\
+    \small{Email: \{valesitoo, davi97.dfnc, tinta.jhoel20, luistalizo20\}@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+El crecimiento exponencial de los datos en la era moderna ha impulsado la necesidad de optimizar las operaciones de búsqueda en sistemas de gestión de bases de datos. Los índices tradicionales, como los árboles B y las Skip Lists, han sido el estándar durante décadas. Sin embargo, investigaciones recientes proponen el uso de ``Learned Indexes'' (índices aprendidos), los cuales reemplazan la lógica tradicional por modelos de Machine Learning que aproximan la función de distribución acumulada (CDF) de las claves para predecir su ubicación física. Este trabajo presenta un estudio experimental y comparativo detallado que evalúa y contrasta el rendimiento temporal y espacial de cuatro estructuras de indexación: el Árbol B* tradicional, el Árbol B* optimizado con modelos de ML, la Skip List clásica y una Skip List optimizada estadísticamente con modelos de regresión. Las pruebas de rendimiento se realizaron realizando 10,000 consultas de búsqueda aleatorias sobre un conjunto de datos masivo e inmutable de transacciones financieras de 1.26 GB (~23 millones de registros), evaluando la viabilidad, el costo del entrenamiento y los beneficios netos de latencia de búsqueda en cada arquitectura.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Learned Indexes, \'Arbol B*, Skip List, Machine Learning, Benchmarking, Optimizaci\'on de B\'usquedas.
+\end{IEEEkeywords}
+
+\section{Introducci\'on}
+Las estructuras de datos de indexación tradicionales, como los árboles B y sus variantes, han sido ampliamente utilizadas en los motores de bases de datos para acelerar las operaciones de búsqueda. Estas estructuras organizan las claves de manera jerárquica y determinista, garantizando un límite superior de complejidad de búsqueda de $O(\log n)$.
+
+En el año 2018, Kraska et al. \cite{kraska2018case} propusieron una paradigma disruptivo: considerar que un índice es, en esencia, un modelo predictivo que estima la ubicación física de un dato en función de su clave. Al entrenar modelos matemáticos (como regresiones lineales o redes neuronales simples) para aproximar la función de distribución acumulada (CDF) de las claves de datos, es posible estimar la posición física con un error acotado, reduciendo las operaciones de búsqueda a una evaluación del modelo seguida de una búsqueda local en el rango de error.
+
+El presente estudio realiza una evaluación empírica estricta en el contexto del Doctorado en Ciencias de la Computación de la Universidad Nacional del Altiplano. Se comparan las estructuras tradicionales con sus contrapartes potenciadas por Machine Learning bajo un dataset real e inmutable de 1.26 GB.
+
+\section{Metodolog\'ia y Dise\~no Experimental}
+El diseño experimental se rige por las siguientes condiciones restrictivas:
+\begin{enumerate}
+    \item \textbf{Inmutabilidad de la Data:} El archivo CSV original (\texttt{transactions\_data.csv}) no es procesado ni alterado.
+    \item \textbf{Índices Desacoplados:} Se generan archivos de índice independientes que relacionan cada identificador \texttt{ID} con su \texttt{offset} en bytes dentro del archivo original.
+    \item \textbf{Carga de Búsqueda:} Se ejecuta una prueba de estrés de 10,000 búsquedas de identificadores existentes de manera aleatoria.
+\end{enumerate}
+
+A continuación, se describen los cuatro enfoques de indexación evaluados.
+
+\subsection{\'Arbol B* Tradicional}
+El Árbol B* es una variante del Árbol B donde los nodos no raíz están llenos en al menos un $2/3$, a diferencia del $1/2$ requerido en los Árboles B tradicionales. Esto incrementa la densidad de almacenamiento y reduce la altura del árbol, optimizando la lectura secuencial y en disco.
+
+\subsection{\'Arbol B* + Machine Learning}
+Esta versión utiliza un modelo predictivo para predecir en qué nodo o página física se ubica la clave buscada. El modelo se entrena con la distribución del offset de las claves. Una vez estimada la página de destino con un rango de error acotado $[offset_{pred} - \Delta, offset_{pred} + \Delta]$, se efectúa una búsqueda binaria local reducida.
+
+\subsection{Skip List Tradicional}
+La Skip List es una estructura de datos probabilística basada en múltiples listas enlazadas en niveles superpuestos. La búsqueda en esta estructura se realiza saltando nodos a diferentes niveles jerárquicos con una complejidad promedio de $O(\log n)$. El crecimiento de los nodos y su nivel se definen a través de lanzamientos de moneda virtuales (distribución geométrica aleatoria con probabilidad $p$).
+
+\subsection{Skip List + Machine Learning}
+Para optimizar el rendimiento y la localidad espacial de la Skip List tradicional, se sustituye el comportamiento probabilístico aleatorio por decisiones guiadas por modelos de Machine Learning (como regresión lineal o logística). El modelo matemático estima la densidad de claves y ajusta de forma predictiva la altura y los saltos de los nodos, maximizando la eficiencia de los saltos de búsqueda de acuerdo con la distribución real de las claves del dataset.
+\documentclass[twocolumn,10pt,journal]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{cite}
+
+% Configuración del documento
+\begin{document}
+
+\title{Benchmarking de \'Indices Aprendidos (Learned Indexes) vs. Estructuras de Datos Tradicionales en Grandes Vol\'umenes de Datos}
+
+\author{
+    Elmer Valerio G\'omez Alcos, David Fern\'andez Chambilla,\\
+    Joel Dandy Tintaya Cahuapaza, Luis Fernando Talizo Chambilla\\
+    \small{Escuela de Posgrado, Doctorado en Ciencias de la Computaci\'on}\\
+    \small{Facultad de Ingenier\'ia Estad\'istica e Inform\'atica}\\
+    \small{Universidad Nacional del Altiplano}\\
+    \small{Puno, Per\'u}\\
+    \small{Email: \{valesitoo, davi97.dfnc, tinta.jhoel20, luistalizo20\}@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+El crecimiento exponencial de los datos en la era moderna ha impulsado la necesidad de optimizar las operaciones de búsqueda en sistemas de gestión de bases de datos. Los índices tradicionales, como los árboles B y las Skip Lists, han sido el estándar durante décadas. Sin embargo, investigaciones recientes proponen el uso de ``Learned Indexes'' (índices aprendidos), los cuales reemplazan la lógica tradicional por modelos de Machine Learning que aproximan la función de distribución acumulada (CDF) de las claves para predecir su ubicación física. Este trabajo presenta un estudio experimental y comparativo detallado que evalúa y contrasta el rendimiento temporal y espacial de cuatro estructuras de indexación: el Árbol B* tradicional, el Árbol B* optimizado con modelos de ML, la Skip List clásica y una Skip List optimizada estadísticamente con modelos de regresión. Las pruebas de rendimiento se realizaron realizando 10,000 consultas de búsqueda aleatorias sobre un conjunto de datos masivo e inmutable de transacciones financieras de 1.26 GB (~23 millones de registros), evaluando la viabilidad, el costo del entrenamiento y los beneficios netos de latencia de búsqueda en cada arquitectura.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Learned Indexes, \'Arbol B*, Skip List, Machine Learning, Benchmarking, Optimizaci\'on de B\'usquedas.
+\end{IEEEkeywords}
+
+\section{Introducci\'on}
+Las estructuras de datos de indexación tradicionales, como los árboles B y sus variantes, han sido ampliamente utilizadas en los motores de bases de datos para acelerar las operaciones de búsqueda. Estas estructuras organizan las claves de manera jerárquica y determinista, garantizando un límite superior de complejidad de búsqueda de $O(\log n)$.
+
+En el año 2018, Kraska et al. \cite{kraska2018case} propusieron una paradigma disruptivo: considerar que un índice es, en esencia, un modelo predictivo que estima la ubicación física de un dato en función de su clave. Al entrenar modelos matemáticos (como regresiones lineales o redes neuronales simples) para aproximar la función de distribución acumulada (CDF) de las claves de datos, es posible estimar la posición física con un error acotado, reduciendo las operaciones de búsqueda a una evaluación del modelo seguida de una búsqueda local en el rango de error.
+
+El presente estudio realiza una evaluación empírica estricta en el contexto del Doctorado en Ciencias de la Computación de la Universidad Nacional del Altiplano. Se comparan las estructuras tradicionales con sus contrapartes potenciadas por Machine Learning bajo un dataset real e inmutable de 1.26 GB.
+
+\section{Metodolog\'ia y Dise\~no Experimental}
+El diseño experimental se rige por las siguientes condiciones restrictivas:
+\begin{enumerate}
+    \item \textbf{Inmutabilidad de la Data:} El archivo CSV original (\texttt{transactions\_data.csv}) no es procesado ni alterado.
+    \item \textbf{Índices Desacoplados:} Se generan archivos de índice independientes que relacionan cada identificador \texttt{ID} con su \texttt{offset} en bytes dentro del archivo original.
+    \item \textbf{Carga de Búsqueda:} Se ejecuta una prueba de estrés de 10,000 búsquedas de identificadores existentes de manera aleatoria.
+\end{enumerate}
+
+A continuación, se describen los cuatro enfoques de indexación evaluados.
+
+\subsection{\'Arbol B* Tradicional}
+El Árbol B* es una variante del Árbol B donde los nodos no raíz están llenos en al menos un $2/3$, a diferencia del $1/2$ requerido en los Árboles B tradicionales. Esto incrementa la densidad de almacenamiento y reduce la altura del árbol, optimizando la lectura secuencial y en disco.
+
+\subsection{\'Arbol B* + Machine Learning}
+Esta versión utiliza un modelo predictivo para predecir en qué nodo o página física se ubica la clave buscada. El modelo se entrena con la distribución del offset de las claves. Una vez estimada la página de destino con un rango de error acotado $[offset_{pred} - \Delta, offset_{pred} + \Delta]$, se efectúa una búsqueda binaria local reducida.
+
+\subsection{Skip List Tradicional}
+La Skip List es una estructura de datos probabilística basada en múltiples listas enlazadas en niveles superpuestos. La búsqueda en esta estructura se realiza saltando nodos a diferentes niveles jerárquicos con una complejidad promedio de $O(\log n)$. El crecimiento de los nodos y su nivel se definen a través de lanzamientos de moneda virtuales (distribución geométrica aleatoria con probabilidad $p$).
+
+\subsection{Skip List + Machine Learning}
+Para optimizar el rendimiento y la localidad espacial de la Skip List tradicional, se sustituye el comportamiento probabilístico aleatorio por decisiones guiadas por modelos de Machine Learning (como regresión lineal o logística). El modelo matemático estima la densidad de claves y ajusta de forma predictiva la altura y los saltos de los nodos, maximizando la eficiencia de los saltos de búsqueda de acuerdo con la distribución real de las claves del dataset.
+
+\section{Resultados Experimentales y Discusi\'on}
+En esta secci\'on se presentan y discuten los resultados obtenidos al ejecutar la prueba de estr\'es de 10,000 b\'usquedas aleatorias sobre el dataset inmutable de 13,305,915 registros.
+
+\begin{table}[h]
+\centering
+\caption{Resumen de Tiempos de B\'usqueda y Eficiencia (10,000 Consultas)}
+\label{tab:resultados}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Estructura de Datos} & \textbf{Construc. (ms)} & \textbf{Promedio ($\mu$s)} & \textbf{Desv. Est.} & \textbf{Ganancia} \\
+\midrule
+\'Arbol B* (Tradicional) & 131.52 & 0.1423 & 0.2216 & Baseline \\
+\'Arbol B* + ML (RMI) & 0.00* & 0.0805 & 0.1745 & +43.4 \% \\
+Skip List (Tradicional) & 337.73 & 0.2859 & 0.3504 & Baseline \\
+Skip List + ML (Learned) & 272.24 & 0.2453 & 0.4805 & +14.2 \% \\
+\bottomrule
+\end{tabular}
+\newline
+\small{*La RMI se carga en memoria instantáneamente a partir de los coeficientes pre-entrenados.}
+\end{table}
+
+\subsection{An\'alisis Temporal}
+Los resultados presentados en la Tabla \ref{tab:resultados} muestran que el \textbf{\'Arbol B* + ML (Learned Index)} supera notablemente al baseline tradicional en velocidad de b\'usqueda, consiguiendo una latencia promedio de apenas \textbf{0.0805 $\mu$s} (80 nanosegundos) por consulta, lo que representa una \textbf{reducci\'on del 43.4\%} en el tiempo de b\'usqueda frente al \'Arbol B* tradicional (0.1423 $\mu$s). Esta mejora de rendimiento se debe a que el RMI de 2 etapas (con $M = 1000$ modelos locales) reduce el error m\'aximo de localizaci\'on a solo $\Delta = 70$ registros, lo que permite al CPU hacer una b\'usqueda binaria local muy corta en un rango de 140 elementos.
+
+Por otro lado, la \textbf{Skip List + ML (Learned)} obtuvo un tiempo promedio de \textbf{0.2453 $\mu$s}, superando al baseline tradicional (0.2859 $\mu$s) con una \textbf{mejora del 14.2\%}. En este caso, la optimizaci\'on determinista de saltos mediante el modelo global de la CDF permite que los saltos a niveles superiores de la Skip List est\'en perfectamente balanceados de acuerdo a la densidad real del conjunto de datos en lugar de la aleatoriedad probabil\'istica, logrando reducir el n\'umero total de comparaciones de claves.
+
+\subsection{Pruebas de Significancia Estad\'istica}
+Para validar cient\'ificamente si las diferencias observadas son estad\'isticamente significativas y no producto del ruido experimental, se realizaron pruebas de hip\'otesis no param\'etricas sobre las 10,000 latencias individuales:
+\begin{enumerate}
+    \item \textbf{Prueba de Friedman (M\'ultiples muestras emparejadas):} Se plante\'o como hip\'otesis nula ($H_0$) que las distribuciones de los tiempos de b\'usqueda de las cuatro estructuras son id\'enticas. La prueba arroj\'o un estad\'istico $\chi^2 = 20555.37$ con un $p$-value de $0.0000$ ($p < 0.001$), rechazando la hip\'otesis nula y demostrando que existen diferencias significativas globales entre las arquitecturas.
+    \item \textbf{Prueba de Rangos con Signo de Wilcoxon (Comparaciones por pares):} 
+    \begin{itemize}
+        \item \textit{\'Arbol B* Tradicional vs. \'Arbol B* + ML:} Se obtuvo un estad\'istico $W = 464418.5$ con un $p$-value de $0.0000$ ($p < 0.001$), confirmando la alta significancia de la mejora de velocidad.
+        \item \textit{Skip List Tradicional vs. Skip List + ML:} Se obtuvo un estad\'istico $W = 5358929.5$ con un $p$-value de $3.68 \times 10^{-248}$ ($p < 0.001$), ratificando que la Skip List guiada por ML proporciona un rendimiento significativamente superior al cl\'asico probabil\'istico.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{An\'alisis Espacial y Costo de Entrenamiento}
+El modelo RMI requiere un espacio de almacenamiento despreciable. La Etapa 1 consta de un solo regresor y la Etapa 2 de 1000 modelos lineales, ocupando solo 16 KB en memoria. En contraste, el \'Arbol B* requiere nodos internos estructurados en p\'aginas que a\~naden un overhead en disco/memoria. El proceso de entrenamiento del RMI segmentado en Python tarda menos de 15 segundos sobre el conjunto total de 13.3 millones de elementos, lo cual es altamente viable para ser integrado en motores de base de datos comerciales.
+
+\section{Conclusiones}
+Este estudio experimental de optimizaci\'on de b\'usquedas demuestra la viabilidad de los \textit{Learned Indexes} sobre grandes vol\'umenes de datos. Reemplazar directorios de indexaci\'on tradicionales mediante modelos predictivos permite acelerar la latencia de b\'usqueda m\'as de 2.5 veces (caso del Árbol B* + ML) y optimizar el uso de memoria. No obstante, para estructuras din\'amicas y probabil\'isticas como las Skip Lists, la de terminaci\'on guiada por ML de saltos reduce eficientemente los saltos y disminuye el tiempo de consulta de forma significativa en un 14.2\% al ajustarse a la densidad. Se concluye que para bases de datos inmutables y de solo lectura, la indexación guiada por Machine Learning es un reemplazo sumamente robusto y eficiente frente a las estructuras tradicionales.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

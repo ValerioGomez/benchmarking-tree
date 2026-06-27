@@ -1,28 +1,28 @@
 {
     "friedman": {
-        "chi2": 33785.41754659741,
+        "chi2": 32489.266053738174,
         "p_value": 0.0,
         "significant": true
     },
     "wilcoxon": {
         "B* Trad vs B* ML": {
-            "W": 2083343.0,
+            "W": 3199488.0,
             "p_value": 0.0,
             "significant": true
         },
         "Skip Trad vs Skip ML": {
-            "W": 10167242.5,
-            "p_value": 0.0,
+            "W": 13869956.5,
+            "p_value": 8.467397186314182e-278,
             "significant": true
         },
         "B* ML vs Segmentado": {
-            "W": 2941618.5,
-            "p_value": 0.0,
+            "W": 10836937.0,
+            "p_value": 4.185878782193924e-239,
             "significant": true
         },
         "B* Trad vs Segmentado": {
-            "W": 12407074.0,
-            "p_value": 2.2078172704038106e-42,
+            "W": 6535224.0,
+            "p_value": 0.0,
             "significant": true
         }
     }

@@ -72,6 +72,56 @@ void printStats(const string& name, const BenchStats& s) {
          << " | Construc: " << setprecision(2) << s.buildTimeMs << " ms" << endl;
 }
 
+void exportResultsJSON(const string& path, 
+                       const BenchStats& s_bt, 
+                       const BenchStats& s_bm, 
+                       const BenchStats& s_st, 
+                       const BenchStats& s_sm, 
+                       const BenchStats& s_seg) {
+    ofstream file(path);
+    if (file.is_open()) {
+        file << "{\n"
+             << "  \"b_star_traditional\": {\n"
+             << "    \"build_time_ms\": " << s_bt.buildTimeMs << ",\n"
+             << "    \"total_search_time_ms\": " << s_bt.totalTimeMs << ",\n"
+             << "    \"avg_latency_us\": " << s_bt.avgLatencyUs << ",\n"
+             << "    \"variance_us\": " << (s_bt.stddevUs * s_bt.stddevUs) << ",\n"
+             << "    \"stddev_us\": " << s_bt.stddevUs << "\n"
+             << "  },\n"
+             << "  \"b_star_ml\": {\n"
+             << "    \"build_time_ms\": " << s_bm.buildTimeMs << ",\n"
+             << "    \"total_search_time_ms\": " << s_bm.totalTimeMs << ",\n"
+             << "    \"avg_latency_us\": " << s_bm.avgLatencyUs << ",\n"
+             << "    \"variance_us\": " << (s_bm.stddevUs * s_bm.stddevUs) << ",\n"
+             << "    \"stddev_us\": " << s_bm.stddevUs << "\n"
+             << "  },\n"
+             << "  \"skip_list_traditional\": {\n"
+             << "    \"build_time_ms\": " << s_st.buildTimeMs << ",\n"
+             << "    \"total_search_time_ms\": " << s_st.totalTimeMs << ",\n"
+             << "    \"avg_latency_us\": " << s_st.avgLatencyUs << ",\n"
+             << "    \"variance_us\": " << (s_st.stddevUs * s_st.stddevUs) << ",\n"
+             << "    \"stddev_us\": " << s_st.stddevUs << "\n"
+             << "  },\n"
+             << "  \"skip_list_ml\": {\n"
+             << "    \"build_time_ms\": " << s_sm.buildTimeMs << ",\n"
+             << "    \"total_search_time_ms\": " << s_sm.totalTimeMs << ",\n"
+             << "    \"avg_latency_us\": " << s_sm.avgLatencyUs << ",\n"
+             << "    \"variance_us\": " << (s_sm.stddevUs * s_sm.stddevUs) << ",\n"
+             << "    \"stddev_us\": " << s_sm.stddevUs << "\n"
+             << "  },\n"
+             << "  \"segmented_index\": {\n"
+             << "    \"build_time_ms\": " << s_seg.buildTimeMs << ",\n"
+             << "    \"total_search_time_ms\": " << s_seg.totalTimeMs << ",\n"
+             << "    \"avg_latency_us\": " << s_seg.avgLatencyUs << ",\n"
+             << "    \"variance_us\": " << (s_seg.stddevUs * s_seg.stddevUs) << ",\n"
+             << "    \"stddev_us\": " << s_seg.stddevUs << "\n"
+             << "  }\n"
+             << "}\n";
+        file.close();
+        cout << "[Opt] Resultados consolidados exportados a JSON: " << path << endl;
+    }
+}
+
 // ============================================================
 // FUNCIÓN DE BENCHMARK SECUENCIAL (Para una estructura)
 // ============================================================
@@ -232,6 +282,9 @@ int main() {
     auto latSegIdx = benchmarkSequential(queryKeys, [&](uint64_t k) { return segIndex.search(k); });
     auto statsSegIdx = computeStats(segBuildMs, latSegIdx);
     printStats("* Indice Segmentado e-Acotado", statsSegIdx);
+
+    string resultsJSONPath = "dev/valerio/analysis/benchmark_results_optimized.json";
+    exportResultsJSON(resultsJSONPath, statsBStarTrad, statsBStarML, statsSkipTrad, statsSkipML, statsSegIdx);
 
     // ----------------------------------------------------------------
     // FASE 5: Verificación de Correctitud

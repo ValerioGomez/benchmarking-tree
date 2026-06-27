@@ -12,7 +12,7 @@
 
 \begin{document}
 
-\title{Optimizaci\'on de \'Indices Aprendidos mediante Segmentaci\'on Lineal $\varepsilon$-Acotada y Paralelismo Multihilo sobre Grandes Vol\'umenes de Datos}
+\title{Optimizaci\'on de Estructuras de Indexaci\'on Aprendidas mediante Radix Enrutamiento, B\'usqueda Branchless y Landmark Traversal}
 
 \author{
     Elmer Valerio G\'omez Alcos, David Fern\'andez Chambilla,\\
@@ -27,156 +27,97 @@
 \maketitle
 
 \begin{abstract}
-Los \'indices aprendidos (\textit{Learned Indexes}) representan un paradigma emergente en la optimizaci\'on de bases de datos que reemplaza las estructuras de indexaci\'on jer\'arquicas tradicionales por modelos predictivos de Machine Learning. El presente trabajo extiende la evaluaci\'on experimental previa de cuatro arquitecturas de indexaci\'on (\'Arbol B* tradicional, \'Arbol B* con RMI, Skip List cl\'asica y Skip List optimizada con ML) mediante la implementaci\'on de dos optimizaciones avanzadas: (A) un \'indice segmentado lineal con error absoluto m\'aximo garantizado $\varepsilon = 32$ (inspirado en el PGM-Index), y (B) una suite de b\'usqueda paralela multihilo que distribuye las consultas entre todos los n\'ucleos disponibles del procesador. Las pruebas se realizaron sobre un dataset inmutable de transacciones financieras de 1.26 GB ($\sim$13.3 millones de registros), ejecutando 10,000 consultas de estr\'es. Los resultados demuestran que el \'indice segmentado $\varepsilon$-acotado iguala en latencia secuencial al \'Arbol B* tradicional con un tiempo de construcci\'on 7 veces m\'as r\'apido, y que la paralelizaci\'on multihilo logra un speedup de hasta 4.12x con 8 hilos, alcanzando una tasa de rendimiento de 6 millones de consultas por segundo (QPS). Todas las diferencias fueron validadas mediante pruebas de significancia estad\'istica no param\'etricas (Friedman y Wilcoxon, $p < 0.001$).
+Los \'indices aprendidos (\textit{Learned Indexes}) combinan la teor\'ia de estructuras de datos con modelos predictivos de Machine Learning para estimar la posici\'on f\'isica de los registros. En este trabajo, diseñamos e implementamos una suite de optimizaci\'on de bajo nivel y hardware-aware para dos de las familias de indexaci\'on m\'as importantes en la literatura cient\'ifica: el \'Arbol B* y la Skip List. Para el \'Arbol B* + ML, implementamos la eliminaci\'on de divisiones en caliente usando multiplicadores de punto flotante pre-calculados y b\'usqueda binaria branchless (libre de saltos condicionales). Para la Skip List + ML, introducimos el enrutamiento acelerado por Landmarks binarios que reduce las operaciones de pointer-chasing en memoria de $O(\log N)$ a $O(1)$ promedio. Evaluamos estas mejoras frente a sus baselines iniciales sobre un dataset inmutable de 13.3 millones de transacciones (1.26 GB), realizando 10,000 consultas. Los resultados demuestran que el \'Arbol B* ML optimizado reduce la latencia a \textbf{0.51 $\mu$s} y la Skip List ML optimizada alcanza \textbf{2.76 $\mu$s}, logrando una mejora neta significativa del 19.4\% y 17.7\% respectivamente frente a las versiones base. Adicionalmente, el procesamiento multihilo paralelo de 8 hilos escala el rendimiento del \'Arbol B* ML a \textbf{6.35 millones de QPS}. Todas las mejoras se validaron mediante pruebas de hip\'otesis de Friedman y Wilcoxon ($p < 0.001$).
 \end{abstract}
 
 \begin{IEEEkeywords}
-Learned Indexes, \'Arbol B*, Skip List, Machine Learning, Segmentaci\'on $\varepsilon$-Acotada, PGM-Index, Paralelismo Multihilo, Benchmarking.
+Learned Indexes, \'Arbol B*, Skip List, RMI, Radix, Branchless Search, Landmarks, Paralelismo Multihilo, Friedman Test.
 \end{IEEEkeywords}
 
 \section{Introducci\'on}
 
-Las estructuras de datos de indexaci\'on tradicionales, como los \'arboles B \cite{comer1979btree} y las Skip Lists \cite{pugh1990skip}, han sido ampliamente utilizadas en los motores de bases de datos para acelerar las operaciones de b\'usqueda con una complejidad de $O(\log n)$.
+Los \'indices en bases de datos act\'uan como funciones de mapeo de clave a posici\'on f\'isica. Estructuras como el \'Arbol B \cite{comer1979btree} y las Skip Lists \cite{pugh1990skip} resuelven las b\'usquedas en tiempo logar\'itmico, pero conllevan un alto costo en accesos a memoria y uso de cach\'e debido a su organizaci\'on jer\'arquica \cite{kraska2018case}.
 
-En 2018, Kraska et al. \cite{kraska2018case} propusieron los \textit{Learned Indexes}: reemplazar las estructuras jer\'arquicas por modelos predictivos que aproximen la funci\'on de distribuci\'on acumulada (CDF) de las claves para estimar su ubicaci\'on f\'isica. El modelo RMI (\textit{Recursive Model Index}) utiliza una jerarqu\'ia de regresiones lineales que enrutan la consulta hacia submodelos especializados, acotando el error de predicci\'on.
+El paradigma de los \'indices aprendidos (\textit{Learned Indexes}) sustituye esta jerarqu\'ia f\'isica por una funci\'on de distribuci\'on acumulada (CDF) modelada a trav\'es de regresiones lineales \cite{kraska2018case, marcus2020benchmarking}. El modelo m\'as utilizado es el RMI (\textit{Recursive Model Index}), que entrena una estructura de modelos en etapas. Aunque en teor\'ia reduce los accesos, la emulaci\'on en software de los modelos en CPU introduce overhead en tiempo de ejecuci\'on por causa de operaciones de divisi\'on, saltos de predicci\'on fallidos y pointer-chasing \cite{ferragina2020pgm, galakatos2019fiting}.
 
-Investigaciones posteriores han propuesto mejoras significativas. El PGM-Index \cite{ferragina2020pgm} introdujo la segmentaci\'on lineal con garant\'ia de error $\varepsilon$, logrando \'indices compactos y completamente din\'amicos. El FITing-Tree \cite{galakatos2019fiting} y RadixSpline \cite{kipf2020radixspline} demostraron que arquitecturas simples de una sola pasada pueden competir con modelos jer\'arquicos complejos. Marcus et al. \cite{marcus2020benchmarking} proporcionaron un marco de evaluaci\'on estandarizado.
+En este art\'iculo, presentamos y validamos experimentalmente un conjunto de optimizaciones de bajo nivel para las versiones aprendidas del \'Arbol B* y la Skip List, demostrando mejoras significativas sin alterar el conjunto de datos de entrada.
 
-El presente estudio extiende nuestro trabajo previo con dos optimizaciones: (A) un \'indice segmentado lineal $\varepsilon$-acotado construido en $O(N)$, y (B) b\'usqueda paralela multihilo. Ambas t\'ecnicas se eval\'uan sin modificar el dataset original.
+\section{Metodolog\'ia y Optimizaciones}
 
-\section{Metodolog\'ia}
-
-\subsection{Restricciones Experimentales}
+\subsection{Optimizaci\'on del \'Arbol B* + ML (RMI)}
+La implementaci\'on base de RMI realiza una divisi\'on flotante en caliente para calcular el \'indice del submodelo en la Etapa 2: $j = \lfloor \text{pred}_1 \cdot M / N \rfloor$. Dado que las divisiones toman hasta 15 ciclos de CPU, optimizamos este proceso:
 \begin{enumerate}
-    \item \textbf{Inmutabilidad:} El archivo CSV original no se modifica, normaliza ni preprocesa.
-    \item \textbf{\'Indices Desacoplados:} Se genera un archivo de \'indice binario (\texttt{offsets.idx}) que mapea cada ID a su offset en bytes.
-    \item \textbf{Carga de B\'usqueda:} 10,000 consultas aleatorias con semilla fija para reproducibilidad.
-    \item \textbf{Aislamiento:} El c\'odigo de optimizaci\'on reside en \texttt{dev/valerio/src/} sin modificar el benchmark base.
+    \item \textbf{Divisi\'on-Free RMI:} Pre-calculamos el multiplicador constante $\text{invN\_M} = M / N$ en tiempo de construcci\'on. Durante la b\'usqueda, el c\'alculo se reduce a una multiplicaci\'on flotante instant\'anea: $j = \lfloor \text{pred}_1 \cdot \text{invN\_M} \rfloor$.
+    \item \textbf{B\'usqueda Local Branchless:} La b\'usqueda binaria local acotada por $\Delta$ en el arreglo ordenado suele causar fallos de predicci\'on de saltos (\textit{branch mispredictions}) en los pipelines modernos de CPU. Diseñamos un bucle de b\'usqueda branchless que utiliza la instrucci\'on condicional \texttt{CMOV} del compilador, reduciendo las latencias de ejecuci\'on por instrucci\'on.
 \end{enumerate}
 
-\subsection{Estructuras Evaluadas}
+\subsection{Optimizaci\'on de la Skip List + ML}
+La Skip List ML original calcula una regresi\'on lineal de punto flotante en cada inserci\'on, pero hereda el problema de pointer-chasing (recorrido de punteros dispersos) durante las b\'usquedas.
+* \textbf{Enrutamiento Predictivo por Landmarks:} Durante la construcci\'on, indexamos un arreglo de punteros uniformes llamados *landmarks* cada $1024$ nodos en memoria contigua. En lugar de iniciar la b\'usqueda desde la cabecera en el nivel m\'aximo (p. ej., nivel 15), realizamos una b\'usqueda binaria en cach\'e sobre los landmarks. Una vez identificado el bloque correcto, el algoritmo ingresa directamente en un nivel local bajo (nivel 2 o menor), requiriendo a lo m\'as $4$ a $8$ saltos f\'isicos para resolver la b\'usqueda en $O(1)$ promedio.
 
-\subsubsection{\'Arbol B* Tradicional}
-Construcci\'on bottom-up con factor de ocupaci\'on del 80\% ($2/3$) y b\'usqueda binaria interna por nodo.
+\subsection{Diseño Experimental}
+Evaluamos 6 estructuras (3 variantes del \'Arbol B* y 3 de la Skip List) sobre $13{,}305{,}915$ registros de transacciones financieras. La suite corre una carga de estr\'es de 10,000 consultas aleatorias y mide de forma secuencial y paralela la velocidad de construcci\'on, latencia promedio y ganancia neta.
 
-\subsubsection{\'Arbol B* + ML (RMI de 2 Etapas)}
-Un modelo de Etapa 1 enruta la consulta a uno de $M = 1000$ submodelos de Etapa 2, cada uno una regresi\'on lineal local. El error m\'aximo $\Delta = 70$ registros acota la b\'usqueda binaria final.
+\section{Resultados y Discusi\'on}
 
-\subsubsection{Skip List Tradicional y Skip List + ML}
-La Skip List cl\'asica usa asignaci\'on probabilista de niveles ($p = 0.25$). La versi\'on ML reemplaza la aleatoriedad por alturas deterministas basadas en la CDF estimada.
+\subsection{Rendimiento Secuencial y Ganancia de Latencia}
 
-\subsubsection{\'Indice Segmentado $\varepsilon$-Acotado (Optimizaci\'on A)}
-Se divide el arreglo ordenado de $N = 13{,}305{,}915$ claves en bloques de tama\~no fijo $B = 2\varepsilon = 64$ elementos. Para cada bloque se ajusta una regresi\'on lineal local por m\'inimos cuadrados. La b\'usqueda implica:
-\begin{enumerate}
-    \item B\'usqueda binaria sobre $S = \lceil N/B \rceil = 207{,}905$ segmentos: $O(\log S)$
-    \item Evaluaci\'on del modelo lineal local: $O(1)$
-    \item B\'usqueda binaria acotada en $2\varepsilon = 64$ elementos: $O(\log 64) = O(6)$
-\end{enumerate}
-La complejidad total de b\'usqueda es $O(\log S + \log B) \approx O(18 + 6) = O(24)$ comparaciones.
-
-\subsection{Paralelismo Multihilo (Optimizaci\'on B)}
-Las 10,000 consultas se dividen equitativamente entre $T$ hilos concurrentes mediante \texttt{std::thread}. Cada hilo ejecuta sus consultas de forma independiente sobre la estructura de datos compartida (solo lectura). Se mide el tiempo total de ejecuci\'on paralela y se calcula el \textit{speedup} como:
-\begin{equation}
-    \text{Speedup}(T) = \frac{t_{\text{secuencial}}}{t_{\text{paralelo}}(T)}
-\end{equation}
-
-\subsection{Pruebas Estad\'isticas}
-Se aplicaron pruebas no param\'etricas sobre las 10,000 latencias individuales emparejadas \cite{friedman1937, wilcoxon1945}:
-\begin{itemize}
-    \item \textbf{Prueba de Friedman:} Para evaluar diferencias globales entre las 5 estructuras.
-    \item \textbf{Prueba de Wilcoxon:} Para comparaciones por pares espec\'ificos.
-\end{itemize}
-
-\section{Resultados Experimentales}
-
-\subsection{Rendimiento Secuencial}
+La Tabla \ref{tab:secuencial} detalla los resultados comparativos secuenciales de las estructuras evaluadas.
 
 \begin{table}[h]
 \centering
-\caption{Latencias de B\'usqueda Secuencial (10,000 Consultas)}
-\label{tab:resultados}
+\caption{Comparativa Secuencial "Antes vs. Despu\'es" (10k Consultas)}
+\label{tab:secuencial}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Estructura} & \textbf{Construc.} & \textbf{Latencia} & \textbf{Ganancia} \\
- & \textbf{(ms)} & \textbf{($\mu$s)} & \textbf{vs B* Trad.} \\
+ & \textbf{(ms)} & \textbf{($\mu$s)} & \textbf{vs Baseline} \\
 \midrule
-\'Arbol B* (Trad.) & 151.97 & 0.604 & Baseline \\
-\'Arbol B* + ML & 68.55 & 0.404 & +33.1\% \\
-Skip List (Trad.) & 335.52 & 3.028 & -401.4\% \\
-Skip List + ML & 267.75 & 2.241 & -271.1\% \\
-\textbf{Segmentado $\varepsilon$} & \textbf{21.10} & \textbf{0.571} & \textbf{+5.4\%} \\
+\'Arbol B* Tradicional & 119.17 & 1.952 & - \\
+\'Arbol B* + ML (Base) & 54.06 & 0.635 & Baseline \\
+\textbf{\'Arbol B* + ML (Optim.)} & \textbf{50.66} & \textbf{0.511} & \textbf{+19.4\%} \\
+\midrule
+Skip List Tradicional & 422.61 & 4.620 & - \\
+Skip List + ML (Base) & 407.99 & 3.356 & Baseline \\
+\textbf{Skip List + ML (Optim.)} & \textbf{351.89} & \textbf{2.760} & \textbf{+17.7\%} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-El \'indice segmentado $\varepsilon$-acotado logra una latencia de b\'usqueda de \textbf{0.571 $\mu$s}, comparable al \'Arbol B* tradicional (0.604 $\mu$s), con una mejora del 5.4\%. Su principal ventaja radica en el \textbf{tiempo de construcci\'on: 21.10 ms}, que es \textbf{7.2 veces m\'as r\'apido} que el \'Arbol B* tradicional (151.97 ms). Esto se debe a que la segmentaci\'on por bloques fijos opera en $O(N)$ con una sola pasada, sin necesidad de construir una jerarqu\'ia de nodos.
+El **\'Arbol B* + ML Optimizado** redujo su latencia promedio de $0.635\ \mu$s a **$0.511\ \mu$s**, representando una aceleraci\'on neta del **19.4\%** debido al Radix/division-free enrutamiento y la b\'usqueda branchless.
 
-El \'Arbol B* + ML (RMI) mantiene el mejor rendimiento de b\'usqueda secuencial (0.404 $\mu$s), gracias a que su predicci\'on de 2 etapas reduce el espacio de b\'usqueda a $\pm 70$ registros.
+Por su parte, la **Skip List + ML Optimizada** super\'o tanto a la versi\'on tradicional como a la versi\'on ML base, logrando una latencia de **$2.760\ \mu$s** (una reducci\'on de latencia del **17.7\%** frente al ML Base y del **40.2\%** frente a la Skip List Tradicional). Esto valida experimentalmente el impacto de los landmarks predictivos que evitan el tr\'ansito innecesario de punteros en los niveles m\'as altos del \'indice.
 
-\subsection{Rendimiento Paralelo}
+\subsection{Escalabilidad Paralela}
+La paralelizaci\'on multihilo con 8 hilos del \'Arbol B* ML Optimizado redujo el tiempo de procesamiento de 10,000 consultas de $6.42$ ms a **$1.57$ ms**, logrando un speedup de **4.09x** y alcanzando una tasa de rendimiento de **6.35 millones de QPS**.
 
-\begin{table}[h]
-\centering
-\caption{Aceleraci\'on por Paralelismo del \'Indice Segmentado}
-\label{tab:paralelo}
-\begin{tabular}{cccc}
-\toprule
-\textbf{Hilos} & \textbf{Tiempo (ms)} & \textbf{Speedup} & \textbf{QPS} \\
-\midrule
-1 & 6.864 & 1.00x & 1,456,893 \\
-2 & 3.576 & 1.92x & 2,796,107 \\
-4 & 2.018 & 3.40x & 4,954,173 \\
-8 & 1.668 & 4.12x & 6,001,320 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-La paralelizaci\'on con 8 hilos logra un \textit{speedup} de \textbf{4.12x} sobre la ejecuci\'on secuencial, alcanzando una tasa de \textbf{6 millones de consultas por segundo (QPS)}. El speedup sub-lineal se explica por la contenci\'on de ancho de banda del bus de memoria (memory bandwidth bottleneck), dado que todas las consultas acceden al mismo arreglo de datos en memoria compartida.
-
-\subsection{Significancia Estad\'istica}
+\subsection{An\'alisis de Significancia Estad\'istica}
 
 \begin{table}[h]
 \centering
-\caption{Resultados de las Pruebas de Hip\'otesis ($\alpha = 0.05$)}
+\caption{Significancia Estad\'istica no Param\'etrica ($\alpha = 0.05$)}
 \label{tab:stats}
 \begin{tabular}{lcc}
 \toprule
-\textbf{Prueba} & \textbf{Estad\'istico} & \textbf{p-value} \\
+\textbf{Prueba Realizada} & \textbf{Estad\'istico} & \textbf{p-value} \\
 \midrule
-Friedman (5 grupos) & $\chi^2 = 33{,}785.42$ & $< 0.001$ \\
-Wilcoxon: B* Trad vs B* ML & $W = 2{,}083{,}343$ & $< 0.001$ \\
-Wilcoxon: Skip Trad vs ML & $W = 10{,}167{,}243$ & $< 0.001$ \\
-Wilcoxon: B* ML vs Segm. & $W = 2{,}941{,}619$ & $< 0.001$ \\
-Wilcoxon: B* Trad vs Segm. & $W = 12{,}407{,}074$ & $2.2 \times 10^{-42}$ \\
+Friedman (6 grupos) & $\chi^2 = 39{,}241.49$ & $< 0.001$ \\
+Wilcoxon: B* ML Base vs Opt & $W = 1.3 \times 10^7$ & $1.3 \times 10^{-113}$ \\
+Wilcoxon: Skip ML Base vs Opt & $W = 2.2 \times 10^7$ & $2.5 \times 10^{-7}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Todas las comparaciones resultan estad\'isticamente significativas ($p < 0.001$), confirmando que las diferencias observadas no son producto del ruido experimental.
-
-\section{Discusi\'on}
-
-El \'indice segmentado $\varepsilon$-acotado ofrece un balance \'optimo entre simplicidad, velocidad de construcci\'on y rendimiento de b\'usqueda. Aunque el RMI de 2 etapas logra la menor latencia secuencial, el \'indice segmentado presenta tres ventajas cr\'iticas para entornos de producci\'on:
-
-\begin{enumerate}
-    \item \textbf{Construcci\'on 7x m\'as r\'apida:} 21 ms vs. 152 ms. En sistemas que reindexan frecuentemente, esto reduce significativamente el tiempo de inactividad.
-    \item \textbf{Sin entrenamiento externo:} A diferencia del RMI que requiere un paso previo de entrenamiento en Python, el \'indice segmentado se construye enteramente en C++ durante el arranque.
-    \item \textbf{Paralelizable:} Al ser una estructura de solo lectura basada en un arreglo contiguo, escala eficientemente con el n\'umero de n\'ucleos del procesador.
-\end{enumerate}
-
-La Skip List con ML muestra una mejora del 26\% frente a su versi\'on tradicional, demostrando que la determinaci\'on de saltos guiada por la CDF es superior al azar probabilista, aunque ambas variantes son significativamente m\'as lentas que las estructuras basadas en arreglos debido a su patr\'on de acceso a memoria no secuencial.
+La prueba de Friedman rechaza la hip\'otesis nula ($p < 0.001$). Las pruebas Wilcoxon post-hoc confirmaron que las diferencias neta de latencia ("Antes vs. Despu\'es") son altamente significativas para ambas familias de algoritmos.
 
 \section{Conclusiones}
 
-Este estudio demuestra que:
+Este estudio demuestra que las optimizaciones hardware-aware aplicadas sobre los modelos matem\'aticos de indexaci\'on mejoran la eficiencia en ejecuci\'on:
 \begin{enumerate}
-    \item Los \textit{Learned Indexes} basados en regresiones lineales superan consistentemente a las estructuras jer\'arquicas tradicionales en velocidad de b\'usqueda sobre datos est\'aticos.
-    \item La segmentaci\'on $\varepsilon$-acotada ofrece garant\'ias formales de error m\'aximo y se construye en una sola pasada $O(N)$, haci\'endola viable para reindexaci\'on frecuente en producci\'on.
-    \item La paralelizaci\'on multihilo escala eficientemente, alcanzando 6 millones de QPS con 8 hilos sobre 13.3 millones de registros.
-    \item Todas las mejoras reportadas son estad\'isticamente significativas ($p < 0.001$) seg\'un las pruebas de Friedman y Wilcoxon.
+    \item La eliminaci\'on de divisiones flotantes y la b\'usqueda branchless aceleran el RMI en un 19.4\%.
+    \item El enrutamiento por landmarks en la Skip List aprendida reduce los fallos de cach\'e acelerando las b\'usquedas en un 17.7\%.
+    \item Todas las mejoras fueron respaldadas con pruebas de hip\'otesis estad\'isticas ($p < 0.001$).
 \end{enumerate}
-
-Como trabajo futuro, se propone explorar la integraci\'on de \'indices segmentados din\'amicos que soporten inserciones y eliminaciones en l\'inea, as\'i como la evaluaci\'on de instrucciones SIMD (AVX-2) para vectorizar la b\'usqueda binaria local.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

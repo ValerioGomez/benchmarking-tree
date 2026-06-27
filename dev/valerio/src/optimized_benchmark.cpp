@@ -1,16 +1,14 @@
 /**
  * @file optimized_benchmark.cpp
- * @brief Suite de Benchmarking Optimizada: Índice Segmentado ε-Acotado + Paralelismo Multihilo
+ * @brief Suite de Benchmarking de Optimización de Modelos ML ("Antes vs. Después")
  * 
- * Este ejecutable es independiente del benchmark base (src/main.cpp) y opera
- * sin modificar ningún archivo del código original.
- * 
- * Funcionalidades:
- *   1. Carga el índice binario existente (data/offsets.idx) sin modificaciones.
- *   2. Construye el nuevo índice segmentado ε-acotado (Optimización A).
- *   3. Compara su rendimiento secuencial contra el RMI base (Optimización existente).
- *   4. Ejecuta las 10,000 consultas en paralelo usando std::thread (Optimización B).
- *   5. Reporta speedup, QPS y exporta latencias para pruebas estadísticas.
+ * Evalúa y compara 6 estructuras de datos indexados:
+ *   1. Árbol B* Tradicional
+ *   2. Árbol B* + ML (RMI Baseline - Antes)
+ *   3. Árbol B* + ML (RMI Optimizado - Después)
+ *   4. Skip List Tradicional
+ *   5. Skip List + ML (Baseline - Antes)
+ *   6. Skip List + ML (Optimizado - Después)
  * 
  * Autores: Valerio Gómez Alcos et al.
  * Doctorado en Ciencias de la Computación - UNA Puno
@@ -32,15 +30,16 @@
 
 using namespace std;
 
-// Incluir las estructuras de datos del proyecto base
+// Incluir cabeceras del proyecto base (usando rutas relativas al archivo)
 #include "../../../src/indexer/csv_indexer.h"
 #include "../../../src/b_star_tree_traditional/b_star_tree_traditional.h"
 #include "../../../src/b_star_tree_ml/b_star_tree_ml.h"
 #include "../../../src/skip_list_traditional/skip_list_traditional.h"
 #include "../../../src/skip_list_ml/skip_list_ml.h"
 
-// Incluir el índice segmentado optimizado
-#include "optimized_index.h"
+// Incluir cabeceras optimizadas
+#include "b_star_tree_ml_optimized.h"
+#include "skip_list_ml_optimized.h"
 
 // ============================================================
 // ESTRUCTURA AUXILIAR PARA ESTADÍSTICAS
@@ -75,9 +74,10 @@ void printStats(const string& name, const BenchStats& s) {
 void exportResultsJSON(const string& path, 
                        const BenchStats& s_bt, 
                        const BenchStats& s_bm, 
+                       const BenchStats& s_bmo, 
                        const BenchStats& s_st, 
                        const BenchStats& s_sm, 
-                       const BenchStats& s_seg) {
+                       const BenchStats& s_smo) {
     ofstream file(path);
     if (file.is_open()) {
         file << "{\n"
@@ -95,6 +95,13 @@ void exportResultsJSON(const string& path,
              << "    \"variance_us\": " << (s_bm.stddevUs * s_bm.stddevUs) << ",\n"
              << "    \"stddev_us\": " << s_bm.stddevUs << "\n"
              << "  },\n"
+             << "  \"b_star_ml_optimized\": {\n"
+             << "    \"build_time_ms\": " << s_bmo.buildTimeMs << ",\n"
+             << "    \"total_search_time_ms\": " << s_bmo.totalTimeMs << ",\n"
+             << "    \"avg_latency_us\": " << s_bmo.avgLatencyUs << ",\n"
+             << "    \"variance_us\": " << (s_bmo.stddevUs * s_bmo.stddevUs) << ",\n"
+             << "    \"stddev_us\": " << s_bmo.stddevUs << "\n"
+             << "  },\n"
              << "  \"skip_list_traditional\": {\n"
              << "    \"build_time_ms\": " << s_st.buildTimeMs << ",\n"
              << "    \"total_search_time_ms\": " << s_st.totalTimeMs << ",\n"
@@ -109,21 +116,21 @@ void exportResultsJSON(const string& path,
              << "    \"variance_us\": " << (s_sm.stddevUs * s_sm.stddevUs) << ",\n"
              << "    \"stddev_us\": " << s_sm.stddevUs << "\n"
              << "  },\n"
-             << "  \"segmented_index\": {\n"
-             << "    \"build_time_ms\": " << s_seg.buildTimeMs << ",\n"
-             << "    \"total_search_time_ms\": " << s_seg.totalTimeMs << ",\n"
-             << "    \"avg_latency_us\": " << s_seg.avgLatencyUs << ",\n"
-             << "    \"variance_us\": " << (s_seg.stddevUs * s_seg.stddevUs) << ",\n"
-             << "    \"stddev_us\": " << s_seg.stddevUs << "\n"
+             << "  \"skip_list_ml_optimized\": {\n"
+             << "    \"build_time_ms\": " << s_smo.buildTimeMs << ",\n"
+             << "    \"total_search_time_ms\": " << s_smo.totalTimeMs << ",\n"
+             << "    \"avg_latency_us\": " << s_smo.avgLatencyUs << ",\n"
+             << "    \"variance_us\": " << (s_smo.stddevUs * s_smo.stddevUs) << ",\n"
+             << "    \"stddev_us\": " << s_smo.stddevUs << "\n"
              << "  }\n"
              << "}\n";
         file.close();
-        cout << "[Opt] Resultados consolidados exportados a JSON: " << path << endl;
+        cout << "[Opt] Resultados exportados a JSON." << endl;
     }
 }
 
 // ============================================================
-// FUNCIÓN DE BENCHMARK SECUENCIAL (Para una estructura)
+// FUNCIONES DE BENCHMARK
 // ============================================================
 template<typename SearchFn>
 vector<double> benchmarkSequential(const vector<uint64_t>& keys, SearchFn fn) {
@@ -131,7 +138,7 @@ vector<double> benchmarkSequential(const vector<uint64_t>& keys, SearchFn fn) {
     latencies.reserve(keys.size());
     for (uint64_t key : keys) {
         auto t1 = chrono::high_resolution_clock::now();
-        volatile uint64_t result = fn(key);  // volatile previene optimización
+        volatile uint64_t result = fn(key);
         auto t2 = chrono::high_resolution_clock::now();
         chrono::duration<double, micro> diff = t2 - t1;
         latencies.push_back(diff.count());
@@ -140,18 +147,13 @@ vector<double> benchmarkSequential(const vector<uint64_t>& keys, SearchFn fn) {
     return latencies;
 }
 
-// ============================================================
-// FUNCIÓN DE BENCHMARK PARALELO (Optimización B)
-// ============================================================
 template<typename SearchFn>
 double benchmarkParallel(const vector<uint64_t>& keys, SearchFn fn, int numThreads) {
-    // Dividir las consultas entre los hilos
     vector<thread> threads;
     int chunkSize = static_cast<int>(keys.size()) / numThreads;
     int remainder = static_cast<int>(keys.size()) % numThreads;
 
     auto start = chrono::high_resolution_clock::now();
-
     int offset = 0;
     for (int t = 0; t < numThreads; ++t) {
         int thisChunk = chunkSize + (t < remainder ? 1 : 0);
@@ -161,27 +163,19 @@ double benchmarkParallel(const vector<uint64_t>& keys, SearchFn fn, int numThrea
 
         threads.emplace_back([&keys, &fn, startIdx, endIdx]() {
             for (int i = startIdx; i < endIdx; ++i) {
-                volatile uint64_t result = fn(keys[i]);
-                (void)result;
+                volatile uint64_t r = fn(keys[i]);
+                (void)r;
             }
         });
     }
-
-    for (auto& t : threads) {
-        t.join();
-    }
-
+    for (auto& t : threads) t.join();
     auto end = chrono::high_resolution_clock::now();
-    chrono::duration<double, milli> elapsed = end - start;
-    return elapsed.count();
+    return chrono::duration<double, milli>(end - start).count();
 }
 
-// ============================================================
-// MAIN
-// ============================================================
 int main() {
     cout << "===========================================================" << endl;
-    cout << "  SUITE DE OPTIMIZACION: INDICE SEGMENTADO + PARALELISMO" << endl;
+    cout << "  SUITE DE OPTIMIZACION DE MODELOS: ANTES VS DESPUES" << endl;
     cout << "  Doctorado en Ciencias de la Computacion - UNA" << endl;
     cout << "===========================================================" << endl;
 
@@ -189,61 +183,61 @@ int main() {
     string modelPath = "data/model_coefficients.txt";
     string csvPath = "data/transactions_data.csv";
 
-    // ----------------------------------------------------------------
-    // FASE 1: Cargar el índice binario
-    // ----------------------------------------------------------------
+    // 1. Cargar el índice binario
     auto loadStart = chrono::high_resolution_clock::now();
     vector<IndexEntry> entries = CSVIndexer::loadIndex(indexPath);
     auto loadEnd = chrono::high_resolution_clock::now();
     if (entries.empty()) {
-        cerr << "[Opt] Error: El indice esta vacio o no existe." << endl;
+        cerr << "[Opt] Error: El indice esta vacio." << endl;
         return 1;
     }
     double loadMs = chrono::duration<double, milli>(loadEnd - loadStart).count();
-
+    
     sort(entries.begin(), entries.end(), [](const IndexEntry& a, const IndexEntry& b) {
         return a.id < b.id;
     });
     cout << "[Opt] Indice cargado y ordenado en: " << loadMs << " ms." << endl;
 
-    // ----------------------------------------------------------------
-    // FASE 2: Generar 10,000 consultas aleatorias
-    // ----------------------------------------------------------------
-    mt19937_64 rng(42);  // Semilla fija para reproducibilidad
+    // 2. Generar consultas
+    mt19937_64 rng(42);
     uniform_int_distribution<size_t> dist(0, entries.size() - 1);
     vector<uint64_t> queryKeys(10000);
     for (auto& key : queryKeys) {
         key = entries[dist(rng)].id;
     }
-    cout << "[Opt] 10,000 consultas generadas." << endl;
 
-    // ----------------------------------------------------------------
-    // FASE 3: Construcción de las estructuras
-    // ----------------------------------------------------------------
+    // 3. Construir estructuras
     cout << "\n============ CONSTRUCCION DE ESTRUCTURAS ============\n" << endl;
 
-    // 3.1 Árbol B* Tradicional
+    // B* Tradicional
     BStarTreeTraditional<uint64_t, uint64_t, 255> bStarTrad;
     auto bt1 = chrono::high_resolution_clock::now();
     bStarTrad.buildBottomUp(entries);
     auto bt2 = chrono::high_resolution_clock::now();
     double bStarTradBuildMs = chrono::duration<double, milli>(bt2 - bt1).count();
 
-    // 3.2 Árbol B* + ML (RMI existente)
+    // B* ML Baseline (Antes)
     BStarTreeML bStarML;
     auto bm1 = chrono::high_resolution_clock::now();
     bStarML.loadModelsAndData(modelPath, entries);
     auto bm2 = chrono::high_resolution_clock::now();
     double bStarMLBuildMs = chrono::duration<double, milli>(bm2 - bm1).count();
 
-    // 3.3 Skip List Tradicional
+    // B* ML Optimizado (Después - Radix/Division-free + Branchless)
+    BStarTreeMLOptimized bStarMLOpt;
+    auto bmo1 = chrono::high_resolution_clock::now();
+    bStarMLOpt.loadModelsAndData(modelPath, entries);
+    auto bmo2 = chrono::high_resolution_clock::now();
+    double bStarMLOptBuildMs = chrono::duration<double, milli>(bmo2 - bmo1).count();
+
+    // Skip List Tradicional
     SkipListTraditional skipTrad(16);
     auto st1 = chrono::high_resolution_clock::now();
     skipTrad.build(entries);
     auto st2 = chrono::high_resolution_clock::now();
     double skipTradBuildMs = chrono::duration<double, milli>(st2 - st1).count();
 
-    // 3.4 Skip List + ML
+    // Skip List ML Baseline (Antes)
     SkipListML skipML(16);
     auto sm1 = chrono::high_resolution_clock::now();
     skipML.loadModel(modelPath);
@@ -251,16 +245,15 @@ int main() {
     auto sm2 = chrono::high_resolution_clock::now();
     double skipMLBuildMs = chrono::duration<double, milli>(sm2 - sm1).count();
 
-    // 3.5 ★ NUEVO: Índice Segmentado ε-Acotado (Optimización A)
-    SegmentedIndex segIndex;
-    auto sg1 = chrono::high_resolution_clock::now();
-    segIndex.build(entries);
-    auto sg2 = chrono::high_resolution_clock::now();
-    double segBuildMs = chrono::duration<double, milli>(sg2 - sg1).count();
+    // Skip List ML Optimizada (Después - Landmark enrutamiento)
+    SkipListMLOptimized skipMLOpt(16);
+    auto smo1 = chrono::high_resolution_clock::now();
+    skipMLOpt.loadModel(modelPath);
+    skipMLOpt.build(entries);
+    auto smo2 = chrono::high_resolution_clock::now();
+    double skipMLOptBuildMs = chrono::duration<double, milli>(smo2 - smo1).count();
 
-    // ----------------------------------------------------------------
-    // FASE 4: Benchmark Secuencial (10,000 consultas en un hilo)
-    // ----------------------------------------------------------------
+    // 4. Benchmark Secuencial
     cout << "\n============ BENCHMARK SECUENCIAL (1 Hilo) ============\n" << endl;
 
     auto latBStarTrad = benchmarkSequential(queryKeys, [&](uint64_t k) { return bStarTrad.search(k); });
@@ -269,7 +262,11 @@ int main() {
 
     auto latBStarML = benchmarkSequential(queryKeys, [&](uint64_t k) { return bStarML.search(k); });
     auto statsBStarML = computeStats(bStarMLBuildMs, latBStarML);
-    printStats("Arbol B* + ML (RMI)", statsBStarML);
+    printStats("Arbol B* + ML (RMI Base)", statsBStarML);
+
+    auto latBStarMLOpt = benchmarkSequential(queryKeys, [&](uint64_t k) { return bStarMLOpt.search(k); });
+    auto statsBStarMLOpt = computeStats(bStarMLOptBuildMs, latBStarMLOpt);
+    printStats("Arbol B* + ML (RMI Optimizado)", statsBStarMLOpt);
 
     auto latSkipTrad = benchmarkSequential(queryKeys, [&](uint64_t k) { return skipTrad.search(k); });
     auto statsSkipTrad = computeStats(skipTradBuildMs, latSkipTrad);
@@ -277,54 +274,44 @@ int main() {
 
     auto latSkipML = benchmarkSequential(queryKeys, [&](uint64_t k) { return skipML.search(k); });
     auto statsSkipML = computeStats(skipMLBuildMs, latSkipML);
-    printStats("Skip List + ML", statsSkipML);
+    printStats("Skip List + ML (Base)", statsSkipML);
 
-    auto latSegIdx = benchmarkSequential(queryKeys, [&](uint64_t k) { return segIndex.search(k); });
-    auto statsSegIdx = computeStats(segBuildMs, latSegIdx);
-    printStats("* Indice Segmentado e-Acotado", statsSegIdx);
+    auto latSkipMLOpt = benchmarkSequential(queryKeys, [&](uint64_t k) { return skipMLOpt.search(k); });
+    auto statsSkipMLOpt = computeStats(skipMLOptBuildMs, latSkipMLOpt);
+    printStats("Skip List + ML (Optimizado)", statsSkipMLOpt);
 
+    // Guardar resultados JSON
     string resultsJSONPath = "dev/valerio/analysis/benchmark_results_optimized.json";
-    exportResultsJSON(resultsJSONPath, statsBStarTrad, statsBStarML, statsSkipTrad, statsSkipML, statsSegIdx);
+    exportResultsJSON(resultsJSONPath, statsBStarTrad, statsBStarML, statsBStarMLOpt, statsSkipTrad, statsSkipML, statsSkipMLOpt);
 
-    // ----------------------------------------------------------------
-    // FASE 5: Verificación de Correctitud
-    // ----------------------------------------------------------------
+    // 5. Verificación de Correctitud
     cout << "\n============ VERIFICACION DE CORRECTITUD ============\n" << endl;
     bool allCorrect = true;
-    int verified = 0;
     for (size_t i = 0; i < queryKeys.size(); ++i) {
         uint64_t key = queryKeys[i];
-        // Ground truth: búsqueda binaria directa sobre el arreglo ordenado
         auto it = lower_bound(entries.begin(), entries.end(), key,
             [](const IndexEntry& e, uint64_t k) { return e.id < k; });
         uint64_t ref = (it != entries.end() && it->id == key) ? it->offset : 0;
-        uint64_t opt = segIndex.search(key);
-        if (ref != opt) {
-            cerr << "[ERROR] Discrepancia en clave " << key
-                 << ": ref=" << ref << " opt=" << opt << endl;
+        uint64_t opt1 = bStarMLOpt.search(key);
+        uint64_t opt2 = skipMLOpt.search(key);
+        if (ref != opt1 || ref != opt2) {
+            cerr << "[ERROR] Discrepancia en clave " << key 
+                 << ": ref=" << ref << " B*Opt=" << opt1 << " SkipOpt=" << opt2 << endl;
             allCorrect = false;
             break;
         }
-        verified++;
     }
     if (allCorrect) {
-        cout << "[Opt] VERIFICACION EXITOSA: " << verified << " consultas verificadas."
-             << " El indice segmentado retorna offsets 100% correctos." << endl;
+        cout << "[Opt] VERIFICACION EXITOSA: B* y Skip List optimizados devuelven offsets 100% correctos." << endl;
     }
 
-    // ----------------------------------------------------------------
-    // FASE 6: Benchmark Paralelo Multihilo (Optimización B)
-    // ----------------------------------------------------------------
+    // 6. Benchmark Paralelo (Hilos concurrentes en B* ML Optimizado)
     int numCores = static_cast<int>(thread::hardware_concurrency());
     if (numCores == 0) numCores = 4;
-
-    cout << "\n============ BENCHMARK PARALELO (" << numCores << " Hilos) ============\n" << endl;
-
-    // Medir tiempo secuencial del índice segmentado (para comparar speedup)
-    double seqTimeMs = benchmarkParallel(queryKeys, [&](uint64_t k) { return segIndex.search(k); }, 1);
+    cout << "\n============ BENCHMARK PARALELO (B* ML Optimizado) ============\n" << endl;
+    double seqTimeMs = benchmarkParallel(queryKeys, [&](uint64_t k) { return bStarMLOpt.search(k); }, 1);
     cout << "  Secuencial (1 hilo):  " << fixed << setprecision(4) << seqTimeMs << " ms" << endl;
 
-    // Paralelismo con 2, 4, 8 hilos y todos los núcleos
     vector<int> threadCounts = {2, 4};
     if (numCores >= 8) threadCounts.push_back(8);
     if (numCores > 8) threadCounts.push_back(numCores);
@@ -333,7 +320,7 @@ int main() {
     parallelResults.push_back({1, seqTimeMs});
 
     for (int nT : threadCounts) {
-        double parTimeMs = benchmarkParallel(queryKeys, [&](uint64_t k) { return segIndex.search(k); }, nT);
+        double parTimeMs = benchmarkParallel(queryKeys, [&](uint64_t k) { return bStarMLOpt.search(k); }, nT);
         double speedup = seqTimeMs / parTimeMs;
         cout << "  Paralelo (" << nT << " hilos):  " << parTimeMs << " ms"
              << " | Speedup: " << setprecision(2) << speedup << "x"
@@ -341,26 +328,24 @@ int main() {
         parallelResults.push_back({nT, parTimeMs});
     }
 
-    // ----------------------------------------------------------------
-    // FASE 7: Exportar Latencias para Pruebas Estadísticas
-    // ----------------------------------------------------------------
+    // 7. Exportar latencias para Python
     string latPath = "dev/valerio/analysis/latencies_optimized.csv";
     ofstream latFile(latPath);
     if (latFile.is_open()) {
-        latFile << "key,b_star_traditional,b_star_ml,skip_list_traditional,skip_list_ml,segmented_index\n";
+        latFile << "key,b_star_traditional,b_star_ml,b_star_ml_optimized,skip_list_traditional,skip_list_ml,skip_list_ml_optimized\n";
         for (size_t i = 0; i < queryKeys.size(); ++i) {
             latFile << queryKeys[i] << ","
                     << latBStarTrad[i] << ","
                     << latBStarML[i] << ","
+                    << latBStarMLOpt[i] << ","
                     << latSkipTrad[i] << ","
                     << latSkipML[i] << ","
-                    << latSegIdx[i] << "\n";
+                    << latSkipMLOpt[i] << "\n";
         }
         latFile.close();
         cout << "\n[Opt] Latencias exportadas a: " << latPath << endl;
     }
 
-    // Exportar resultados del paralelismo
     string parPath = "dev/valerio/analysis/parallel_results.csv";
     ofstream parFile(parPath);
     if (parFile.is_open()) {
@@ -371,39 +356,18 @@ int main() {
             parFile << nT << "," << tMs << "," << sp << "," << qps << "\n";
         }
         parFile.close();
-        cout << "[Opt] Resultados paralelos exportados a: " << parPath << endl;
+        cout << "[Opt] Resultados de paralelismo exportados." << endl;
     }
 
-    // ----------------------------------------------------------------
-    // RESUMEN COMPARATIVO FINAL
-    // ----------------------------------------------------------------
-    cout << "\n============ RESUMEN COMPARATIVO FINAL ============\n" << endl;
-    cout << "  Estructura                         | Latencia Prom.  | Ganancia vs B* Trad." << endl;
-    cout << "  -----------------------------------|-----------------|---------------------" << endl;
-    
-    double baseline = statsBStarTrad.avgLatencyUs;
-    auto pctGain = [&](double lat) -> double { return (1.0 - lat / baseline) * 100.0; };
-    
-    cout << "  " << left << setw(37) << "Arbol B* Tradicional" 
-         << "| " << setw(15) << statsBStarTrad.avgLatencyUs << " us | Baseline" << endl;
-    cout << "  " << setw(37) << "Arbol B* + ML (RMI)"
-         << "| " << setw(15) << statsBStarML.avgLatencyUs << " us | +" << fixed << setprecision(1) << pctGain(statsBStarML.avgLatencyUs) << " %" << endl;
-    cout << "  " << setw(37) << "Skip List Tradicional"
-         << "| " << setw(15) << statsSkipTrad.avgLatencyUs << " us | " << pctGain(statsSkipTrad.avgLatencyUs) << " %" << endl;
-    cout << "  " << setw(37) << "Skip List + ML"
-         << "| " << setw(15) << statsSkipML.avgLatencyUs << " us | " << pctGain(statsSkipML.avgLatencyUs) << " %" << endl;
-    cout << "  " << setw(37) << "* INDICE SEGMENTADO e-ACOTADO"
-         << "| " << setw(15) << statsSegIdx.avgLatencyUs << " us | +" << pctGain(statsSegIdx.avgLatencyUs) << " %" << endl;
-
-    // Modo interactivo
+    // 8. Consultas interactivas de comparación directa
     cout << "\n===========================================================" << endl;
-    cout << "  CONSULTAS INTERACTIVAS" << endl;
+    cout << "  CONSULTAS INTERACTIVAS (COMPARATIVA DE 5 ESTRUCTURAS + OPTIMIZACIONES)" << endl;
     cout << "===========================================================" << endl;
-    cout << "[Interactive] Desea buscar IDs? (s/n): ";
+    cout << "[Interactive] Desea realizar una busqueda individual? (s/n): ";
     char choice;
     if (cin >> choice && (choice == 's' || choice == 'S')) {
         while (true) {
-            cout << "\n[Interactive] Ingrese el ID (o 0 para salir): ";
+            cout << "\n[Interactive] Ingrese el ID a buscar (o 0 para salir): ";
             uint64_t targetId;
             if (!(cin >> targetId) || targetId == 0) break;
 
@@ -412,21 +376,24 @@ int main() {
             auto t2 = chrono::high_resolution_clock::now();
             uint64_t o2 = bStarML.search(targetId);
             auto t3 = chrono::high_resolution_clock::now();
-            uint64_t o3 = skipTrad.search(targetId);
+            uint64_t o3 = bStarMLOpt.search(targetId);
             auto t4 = chrono::high_resolution_clock::now();
-            uint64_t o4 = skipML.search(targetId);
+            uint64_t o4 = skipTrad.search(targetId);
             auto t5 = chrono::high_resolution_clock::now();
-            uint64_t o5 = segIndex.search(targetId);
+            uint64_t o5 = skipML.search(targetId);
             auto t6 = chrono::high_resolution_clock::now();
+            uint64_t o6 = skipMLOpt.search(targetId);
+            auto t7 = chrono::high_resolution_clock::now();
 
             cout << "\n----------------------------------------------------------" << endl;
-            cout << "  RESULTADOS PARA ID: " << targetId << endl;
+            cout << "  RESULTADOS EN NANOSEGUNDOS (ns) PARA EL ID: " << targetId << endl;
             cout << "----------------------------------------------------------" << endl;
-            cout << "1. B* Tradicional:          Offset=" << o1 << " | " << chrono::duration<double, nano>(t2-t1).count() << " ns" << endl;
-            cout << "2. B* + ML (RMI):           Offset=" << o2 << " | " << chrono::duration<double, nano>(t3-t2).count() << " ns" << endl;
-            cout << "3. Skip List Tradicional:   Offset=" << o3 << " | " << chrono::duration<double, nano>(t4-t3).count() << " ns" << endl;
-            cout << "4. Skip List + ML:          Offset=" << o4 << " | " << chrono::duration<double, nano>(t5-t4).count() << " ns" << endl;
-            cout << "5. *Segmentado e-Acotado:   Offset=" << o5 << " | " << chrono::duration<double, nano>(t6-t5).count() << " ns" << endl;
+            cout << "1. Arbol B* Tradicional:         Offset=" << o1 << " | Tiempo=" << chrono::duration<double, nano>(t2-t1).count() << " ns" << endl;
+            cout << "2. Arbol B* + ML (RMI Base):     Offset=" << o2 << " | Tiempo=" << chrono::duration<double, nano>(t3-t2).count() << " ns" << endl;
+            cout << "3. Arbol B* + ML (RMI Optim.):   Offset=" << o3 << " | Tiempo=" << chrono::duration<double, nano>(t4-t3).count() << " ns" << endl;
+            cout << "4. Skip List Tradicional:        Offset=" << o4 << " | Tiempo=" << chrono::duration<double, nano>(t5-t4).count() << " ns" << endl;
+            cout << "5. Skip List + ML (Base):        Offset=" << o5 << " | Tiempo=" << chrono::duration<double, nano>(t6-t5).count() << " ns" << endl;
+            cout << "6. Skip List + ML (Optim.):      Offset=" << o6 << " | Tiempo=" << chrono::duration<double, nano>(t7-t6).count() << " ns" << endl;
             cout << "----------------------------------------------------------" << endl;
 
             if (o1 != 0) {
@@ -435,12 +402,12 @@ int main() {
                     csvFile.seekg(o1);
                     string line;
                     if (getline(csvFile, line)) {
-                        cout << "[CSV] " << line << endl;
+                        cout << "[CSV] Registro: " << line << endl;
                     }
                     csvFile.close();
                 }
             } else {
-                cout << "[CSV] ID no encontrado." << endl;
+                cout << "[CSV] Registro no encontrado." << endl;
             }
         }
     }

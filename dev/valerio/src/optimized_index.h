@@ -31,7 +31,7 @@
 
 using namespace std;
 
-#include "indexer/csv_indexer.h"
+#include "../../../src/indexer/csv_indexer.h"
 
 /**
  * @brief Segmento lineal con modelo local y rango de datos.

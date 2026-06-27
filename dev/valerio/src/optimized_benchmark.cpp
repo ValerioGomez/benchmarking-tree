@@ -33,11 +33,11 @@
 using namespace std;
 
 // Incluir las estructuras de datos del proyecto base
-#include "indexer/csv_indexer.h"
-#include "b_star_tree_traditional/b_star_tree_traditional.h"
-#include "b_star_tree_ml/b_star_tree_ml.h"
-#include "skip_list_traditional/skip_list_traditional.h"
-#include "skip_list_ml/skip_list_ml.h"
+#include "../../../src/indexer/csv_indexer.h"
+#include "../../../src/b_star_tree_traditional/b_star_tree_traditional.h"
+#include "../../../src/b_star_tree_ml/b_star_tree_ml.h"
+#include "../../../src/skip_list_traditional/skip_list_traditional.h"
+#include "../../../src/skip_list_ml/skip_list_ml.h"
 
 // Incluir el índice segmentado optimizado
 #include "optimized_index.h"

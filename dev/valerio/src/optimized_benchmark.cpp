@@ -412,5 +412,12 @@ int main() {
         }
     }
 
+    cout << "\n===========================================================" << endl;
+    cout << "Presione Enter para salir...";
+    cin.clear();
+    // Limpiar el búfer para evitar consumir caracteres anteriores
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cin.get();
+
     return 0;
 }

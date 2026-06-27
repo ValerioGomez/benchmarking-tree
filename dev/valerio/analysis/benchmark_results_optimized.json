@@ -1,44 +1,44 @@
 {
   "b_star_traditional": {
-    "build_time_ms": 119.168,
-    "total_search_time_ms": 19.519,
-    "avg_latency_us": 1.9519,
-    "variance_us": 2024.61,
-    "stddev_us": 44.9956
+    "build_time_ms": 187.296,
+    "total_search_time_ms": 20.8228,
+    "avg_latency_us": 2.08228,
+    "variance_us": 5730.3,
+    "stddev_us": 75.6987
   },
   "b_star_ml": {
-    "build_time_ms": 54.0615,
-    "total_search_time_ms": 6.3483,
-    "avg_latency_us": 0.63483,
-    "variance_us": 0.387872,
-    "stddev_us": 0.622794
+    "build_time_ms": 107.519,
+    "total_search_time_ms": 6.2299,
+    "avg_latency_us": 0.62299,
+    "variance_us": 0.124532,
+    "stddev_us": 0.352892
   },
   "b_star_ml_optimized": {
-    "build_time_ms": 50.6559,
-    "total_search_time_ms": 5.1136,
-    "avg_latency_us": 0.51136,
-    "variance_us": 0.058253,
-    "stddev_us": 0.241356
+    "build_time_ms": 94.9562,
+    "total_search_time_ms": 8.4754,
+    "avg_latency_us": 0.84754,
+    "variance_us": 66.9722,
+    "stddev_us": 8.18366
   },
   "skip_list_traditional": {
-    "build_time_ms": 422.608,
-    "total_search_time_ms": 46.1966,
-    "avg_latency_us": 4.61966,
-    "variance_us": 1697.87,
-    "stddev_us": 41.2052
+    "build_time_ms": 489.513,
+    "total_search_time_ms": 79.9999,
+    "avg_latency_us": 7.99999,
+    "variance_us": 1118.91,
+    "stddev_us": 33.4501
   },
   "skip_list_ml": {
-    "build_time_ms": 407.988,
-    "total_search_time_ms": 33.5631,
-    "avg_latency_us": 3.35631,
-    "variance_us": 1384.78,
-    "stddev_us": 37.2127
+    "build_time_ms": 427.409,
+    "total_search_time_ms": 47.8071,
+    "avg_latency_us": 4.78071,
+    "variance_us": 351.069,
+    "stddev_us": 18.7368
   },
   "skip_list_ml_optimized": {
-    "build_time_ms": 351.895,
-    "total_search_time_ms": 27.6017,
-    "avg_latency_us": 2.76017,
-    "variance_us": 95.3365,
-    "stddev_us": 9.76404
+    "build_time_ms": 427.038,
+    "total_search_time_ms": 60.0897,
+    "avg_latency_us": 6.00897,
+    "variance_us": 10068.9,
+    "stddev_us": 100.344
   }
 }

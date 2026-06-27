@@ -1,0 +1,22 @@
+{
+    "friedman": {
+        "statistic": 20555.365417366207,
+        "p_value": 0.0,
+        "significant": true
+    },
+    "wilcoxon_b_star": {
+        "statistic": 464418.5,
+        "p_value": 0.0,
+        "significant": true
+    },
+    "wilcoxon_skip_list": {
+        "statistic": 5358929.5,
+        "p_value": 3.688143627441537e-248,
+        "significant": true
+    },
+    "wilcoxon_learned_comparison": {
+        "statistic": 261010.5,
+        "p_value": 0.0,
+        "significant": true
+    }
+}

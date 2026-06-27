@@ -242,5 +242,23 @@ int main() {
     closeFile.close();
     cout << "[Main] Resultados consolidados exportados a: " << resultsPath << endl;
 
+    // Exportar las latencias crudas a un archivo CSV para pruebas estadísticas
+    string latenciesPath = "analysis/latencies.csv";
+    ofstream latFile(latenciesPath);
+    if (latFile.is_open()) {
+        latFile << "key,b_star_traditional,b_star_ml,skip_list_traditional,skip_list_ml\n";
+        for (size_t i = 0; i < queryKeys.size(); ++i) {
+            latFile << queryKeys[i] << ","
+                    << bStarTradLatencies[i] << ","
+                    << bStarMLLatencies[i] << ","
+                    << skipTradLatencies[i] << ","
+                    << skipMLLatencies[i] << "\n";
+        }
+        latFile.close();
+        cout << "[Main] Latencias individuales exportadas a: " << latenciesPath << " para pruebas estadisticas." << endl;
+    } else {
+        cerr << "[Main] Error: No se pudo crear el archivo de latencias en: " << latenciesPath << endl;
+    }
+
     return 0;
 }

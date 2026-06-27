@@ -1,0 +1,30 @@
+{
+  "b_star_traditional": {
+    "build_time_ms": 121.093,
+    "total_search_time_ms": 1.9558,
+    "avg_latency_us": 0.19558,
+    "variance_us": 0.120876,
+    "stddev_us": 0.347673
+  },
+  "b_star_ml": {
+    "build_time_ms": 53.5234,
+    "total_search_time_ms": 0.7752,
+    "avg_latency_us": 0.07752,
+    "variance_us": 0.00501665,
+    "stddev_us": 0.0708283
+  },
+  "skip_list_traditional": {
+    "build_time_ms": 318.009,
+    "total_search_time_ms": 2.5263,
+    "avg_latency_us": 0.25263,
+    "variance_us": 0.156003,
+    "stddev_us": 0.394972
+  },
+  "skip_list_ml": {
+    "build_time_ms": 278.26,
+    "total_search_time_ms": 3.0621,
+    "avg_latency_us": 0.30621,
+    "variance_us": 0.740042,
+    "stddev_us": 0.860257
+  }
+}

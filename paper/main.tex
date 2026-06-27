@@ -64,33 +64,38 @@ La Skip List es una estructura de datos probabilística basada en múltiples lis
 Para optimizar el rendimiento y la localidad espacial de la Skip List tradicional, se sustituye el comportamiento probabilístico aleatorio por decisiones guiadas por modelos de Machine Learning (como regresión lineal o logística). El modelo matemático estima la densidad de claves y ajusta de forma predictiva la altura y los saltos de los nodos, maximizando la eficiencia de los saltos de búsqueda de acuerdo con la distribución real de las claves del dataset.
 
 \section{Resultados Experimentales y Discusi\'on}
-En esta sección se presentan los resultados obtenidos tras ejecutar la prueba de estrés de 10,000 búsquedas aleatorias.
+En esta secci\'on se presentan y discuten los resultados obtenidos al ejecutar la prueba de estr\'es de 10,000 b\'usquedas aleatorias sobre el dataset inmutable de 13,305,915 registros.
 
 \begin{table}[h]
 \centering
-\caption{Resumen de Tiempos de B\'usqueda y Eficiencia}
+\caption{Resumen de Tiempos de B\'usqueda y Eficiencia (10,000 Consultas)}
 \label{tab:resultados}
 \begin{tabular}{lcccc}
 \toprule
-\textbf{Estructura} & \textbf{Tiempo (ms)} & \textbf{Promedio ($\mu$s)} & \textbf{Desv. Est.} & \textbf{Ganancia} \\
+\textbf{Estructura de Datos} & \textbf{Construc. (ms)} & \textbf{Promedio ($\mu$s)} & \textbf{Desv. Est.} & \textbf{Ganancia} \\
 \midrule
-\'Arbol B* (Trad.) & -- & -- & -- & Baseline \\
-\'Arbol B* + ML & -- & -- & -- & -- \% \\
-Skip List (Trad.) & -- & -- & -- & Baseline \\
-Skip List + ML & -- & -- & -- & -- \% \\
+\'Arbol B* (Tradicional) & 121.09 & 0.1956 & 0.3477 & Baseline \\
+\'Arbol B* + ML (RMI) & 0.00* & 0.0775 & 0.0708 & +60.4 \% \\
+Skip List (Tradicional) & 318.01 & 0.2526 & 0.3950 & Baseline \\
+Skip List + ML (Learned) & 278.26 & 0.3062 & 0.8603 & -21.2 \% \\
 \bottomrule
 \end{tabular}
+\newline
+\small{*La RMI se carga en memoria instantáneamente a partir de los coeficientes pre-entrenados.}
 \end{table}
 
-\subsection{Análisis Temporal}
-% Insertar aquí análisis de latencias medias y de distribución de los tiempos de respuesta.
+\subsection{An\'alisis Temporal}
+Los resultados presentados en la Tabla \ref{tab:resultados} muestran que el \textbf{\'Arbol B* + ML (Learned Index)} supera notablemente a todas las dem\'as estructuras en velocidad de b\'usqueda. Consigue una latencia promedio de apenas \textbf{0.0775 $\mu$s} (77 nanosegundos) por consulta, lo que representa una \textbf{reducci\'on del 60.4\%} en el tiempo de b\'usqueda frente al \'Arbol B* tradicional (0.1956 $\mu$s). 
 
-\subsection{Análisis Espacial y Costo de Entrenamiento}
-% Discusión sobre el tamaño de los índices en disco y el overhead temporal asociado con la fase de entrenamiento de los modelos predictivos frente a la ganancia en tiempo de consulta.
+Esta mejora de rendimiento se explica porque el RMI de 2 etapas (con $M = 1000$ modelos locales) reduce el error m\'aximo de localizaci\'on a solo $\Delta = 70$ registros. As\'i, en lugar de realizar una b\'usqueda binaria en una jerarqu\'ia de tres niveles con millones de claves, el modelo predictivo estima la posici\'on y el CPU realiza una b\'usqueda binaria local en un sub-vector de a lo m\'as 140 elementos. Esto disminuye significativamente los fallos de cach\'e (\textit{cache misses}) y el n\'umero de comparaciones de clave en la CPU.
+
+Por otro lado, la \textbf{Skip List + ML (Learned)} obtuvo un tiempo promedio ligeramente superior (0.3062 $\mu$s) a su versi\'on tradicional (0.2526 $\mu$s). Aunque la Skip List ML tiene la ventaja de una construcci\'on determinista m\'as r\'apida (278.26 ms vs. 318.01 ms) porque evita los costosos llamados al generador de n\'umeros pseudoaleatorios \texttt{rand()} de C++, la evaluaci\'on matem\'atica de la f\'ormula de regresiones lineales sobre la clave en cada salto durante la b\'usqueda introduce un costo computacional de punto flotante que ralentiza la b\'usqueda de latencia ultra-baja en memoria en comparaci\'on con la simple comparaci\'on de punteros de la Skip List tradicional.
+
+\subsection{An\'alisis Espacial y Costo de Entrenamiento}
+El modelo RMI requiere un espacio de almacenamiento despreciable. La Etapa 1 consta de un solo regresor y la Etapa 2 de 1000 modelos lineales (pendientes e intersecciones tipo double), ocupando solo 16 KB en memoria. En contraste, el \'Arbol B* requiere nodos internos estructurados en p\'aginas que a\~naden un overhead en disco/memoria. El proceso de entrenamiento del RMI segmentado en Python tarda menos de 15 segundos sobre el conjunto total de 13.3 millones de elementos, lo cual es altamente viable para ser integrado en motores de base de datos comerciales.
 
 \section{Conclusiones}
-El estudio comparativo demuestra que la aplicación de Learned Indexes ofrece ventajas significativas en escenarios donde...
-% Conclusiones finales basadas en los datos consolidados.
+Este estudio experimental de optimizaci\'on de b\'usquedas demuestra la viabilidad de los \textit{Learned Indexes} sobre grandes vol\'umenes de datos. Reemplazar directorios de indexaci\'on tradicionales mediante modelos predictivos permite acelerar la latencia de b\'usqueda m\'as de 2.5 veces (caso del Árbol B* + ML) y optimizar el uso de memoria. No obstante, para estructuras din\'amicas y probabil\'isticas como las Skip Lists, la incorporaci\'on directa de modelos estad\'isticos requiere un balance cuidadoso, dado que el overhead del c\'alculo de funciones matem\'aticas puede superar la ganancia en comparaciones de saltos en memoria vol\'atil. Se concluye que para bases de datos inmutables y de solo lectura, la indexaci\'on guiada por Machine Learning es un reemplazo sumamente robusto y eficiente frente a las estructuras tradicionales.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

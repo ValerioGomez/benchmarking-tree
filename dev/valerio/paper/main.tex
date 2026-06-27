@@ -47,7 +47,7 @@ En este art\'iculo, presentamos y validamos experimentalmente un conjunto de opt
 \subsection{Optimizaci\'on del \'Arbol B* + ML (RMI)}
 La implementaci\'on base de RMI realiza una divisi\'on flotante en caliente para calcular el \'indice del submodelo en la Etapa 2: $j = \lfloor \text{pred}_1 \cdot M / N \rfloor$. Dado que las divisiones toman hasta 15 ciclos de CPU, optimizamos este proceso:
 \begin{enumerate}
-    \item \textbf{Divisi\'on-Free RMI:} Pre-calculamos el multiplicador constante $\text{invN\_M} = M / N$ en tiempo de construcci\'on. Durante la b\'usqueda, el c\'alculo se reduce a una multiplicaci\'on flotante instant\'anea: $j = \lfloor \text{pred}_1 \cdot \text{invN\_M} \rfloor$.
+    \item \textbf{Divisi\'on-Free RMI:} Pre-calculamos el multiplicador constante $\text{invN\textunderscore M} = M / N$ en tiempo de construcci\'on. Durante la b\'usqueda, el c\'alculo se reduce a una multiplicaci\'on flotante instant\'anea: $j = \lfloor \text{pred}_1 \cdot \text{invN\textunderscore M} \rfloor$.
     \item \textbf{B\'usqueda Local Branchless:} La b\'usqueda binaria local acotada por $\Delta$ en el arreglo ordenado suele causar fallos de predicci\'on de saltos (\textit{branch mispredictions}) en los pipelines modernos de CPU. Diseñamos un bucle de b\'usqueda branchless que utiliza la instrucci\'on condicional \texttt{CMOV} del compilador, reduciendo las latencias de ejecuci\'on por instrucci\'on.
 \end{enumerate}
 

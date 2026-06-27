@@ -1,0 +1,184 @@
+\documentclass[twocolumn,10pt,journal]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{multirow}
+
+\begin{document}
+
+\title{Optimizaci\'on de \'Indices Aprendidos mediante Segmentaci\'on Lineal $\varepsilon$-Acotada y Paralelismo Multihilo sobre Grandes Vol\'umenes de Datos}
+
+\author{
+    Elmer Valerio G\'omez Alcos, David Fern\'andez Chambilla,\\
+    Joel Dandy Tintaya Cahuapaza, Luis Fernando Talizo Chambilla\\
+    \small{Escuela de Posgrado, Doctorado en Ciencias de la Computaci\'on}\\
+    \small{Facultad de Ingenier\'ia Estad\'istica e Inform\'atica}\\
+    \small{Universidad Nacional del Altiplano}\\
+    \small{Puno, Per\'u}\\
+    \small{Email: \{valesitoo, davi97.dfnc, tinta.jhoel20, luistalizo20\}@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Los \'indices aprendidos (\textit{Learned Indexes}) representan un paradigma emergente en la optimizaci\'on de bases de datos que reemplaza las estructuras de indexaci\'on jer\'arquicas tradicionales por modelos predictivos de Machine Learning. El presente trabajo extiende la evaluaci\'on experimental previa de cuatro arquitecturas de indexaci\'on (\'Arbol B* tradicional, \'Arbol B* con RMI, Skip List cl\'asica y Skip List optimizada con ML) mediante la implementaci\'on de dos optimizaciones avanzadas: (A) un \'indice segmentado lineal con error absoluto m\'aximo garantizado $\varepsilon = 32$ (inspirado en el PGM-Index), y (B) una suite de b\'usqueda paralela multihilo que distribuye las consultas entre todos los n\'ucleos disponibles del procesador. Las pruebas se realizaron sobre un dataset inmutable de transacciones financieras de 1.26 GB ($\sim$13.3 millones de registros), ejecutando 10,000 consultas de estr\'es. Los resultados demuestran que el \'indice segmentado $\varepsilon$-acotado iguala en latencia secuencial al \'Arbol B* tradicional con un tiempo de construcci\'on 7 veces m\'as r\'apido, y que la paralelizaci\'on multihilo logra un speedup de hasta 4.12x con 8 hilos, alcanzando una tasa de rendimiento de 6 millones de consultas por segundo (QPS). Todas las diferencias fueron validadas mediante pruebas de significancia estad\'istica no param\'etricas (Friedman y Wilcoxon, $p < 0.001$).
+\end{abstract}
+
+\begin{IEEEkeywords}
+Learned Indexes, \'Arbol B*, Skip List, Machine Learning, Segmentaci\'on $\varepsilon$-Acotada, PGM-Index, Paralelismo Multihilo, Benchmarking.
+\end{IEEEkeywords}
+
+\section{Introducci\'on}
+
+Las estructuras de datos de indexaci\'on tradicionales, como los \'arboles B \cite{comer1979btree} y las Skip Lists \cite{pugh1990skip}, han sido ampliamente utilizadas en los motores de bases de datos para acelerar las operaciones de b\'usqueda con una complejidad de $O(\log n)$.
+
+En 2018, Kraska et al. \cite{kraska2018case} propusieron los \textit{Learned Indexes}: reemplazar las estructuras jer\'arquicas por modelos predictivos que aproximen la funci\'on de distribuci\'on acumulada (CDF) de las claves para estimar su ubicaci\'on f\'isica. El modelo RMI (\textit{Recursive Model Index}) utiliza una jerarqu\'ia de regresiones lineales que enrutan la consulta hacia submodelos especializados, acotando el error de predicci\'on.
+
+Investigaciones posteriores han propuesto mejoras significativas. El PGM-Index \cite{ferragina2020pgm} introdujo la segmentaci\'on lineal con garant\'ia de error $\varepsilon$, logrando \'indices compactos y completamente din\'amicos. El FITing-Tree \cite{galakatos2019fiting} y RadixSpline \cite{kipf2020radixspline} demostraron que arquitecturas simples de una sola pasada pueden competir con modelos jer\'arquicos complejos. Marcus et al. \cite{marcus2020benchmarking} proporcionaron un marco de evaluaci\'on estandarizado.
+
+El presente estudio extiende nuestro trabajo previo con dos optimizaciones: (A) un \'indice segmentado lineal $\varepsilon$-acotado construido en $O(N)$, y (B) b\'usqueda paralela multihilo. Ambas t\'ecnicas se eval\'uan sin modificar el dataset original.
+
+\section{Metodolog\'ia}
+
+\subsection{Restricciones Experimentales}
+\begin{enumerate}
+    \item \textbf{Inmutabilidad:} El archivo CSV original no se modifica, normaliza ni preprocesa.
+    \item \textbf{\'Indices Desacoplados:} Se genera un archivo de \'indice binario (\texttt{offsets.idx}) que mapea cada ID a su offset en bytes.
+    \item \textbf{Carga de B\'usqueda:} 10,000 consultas aleatorias con semilla fija para reproducibilidad.
+    \item \textbf{Aislamiento:} El c\'odigo de optimizaci\'on reside en \texttt{dev/valerio/src/} sin modificar el benchmark base.
+\end{enumerate}
+
+\subsection{Estructuras Evaluadas}
+
+\subsubsection{\'Arbol B* Tradicional}
+Construcci\'on bottom-up con factor de ocupaci\'on del 80\% ($2/3$) y b\'usqueda binaria interna por nodo.
+
+\subsubsection{\'Arbol B* + ML (RMI de 2 Etapas)}
+Un modelo de Etapa 1 enruta la consulta a uno de $M = 1000$ submodelos de Etapa 2, cada uno una regresi\'on lineal local. El error m\'aximo $\Delta = 70$ registros acota la b\'usqueda binaria final.
+
+\subsubsection{Skip List Tradicional y Skip List + ML}
+La Skip List cl\'asica usa asignaci\'on probabilista de niveles ($p = 0.25$). La versi\'on ML reemplaza la aleatoriedad por alturas deterministas basadas en la CDF estimada.
+
+\subsubsection{\'Indice Segmentado $\varepsilon$-Acotado (Optimizaci\'on A)}
+Se divide el arreglo ordenado de $N = 13{,}305{,}915$ claves en bloques de tama\~no fijo $B = 2\varepsilon = 64$ elementos. Para cada bloque se ajusta una regresi\'on lineal local por m\'inimos cuadrados. La b\'usqueda implica:
+\begin{enumerate}
+    \item B\'usqueda binaria sobre $S = \lceil N/B \rceil = 207{,}905$ segmentos: $O(\log S)$
+    \item Evaluaci\'on del modelo lineal local: $O(1)$
+    \item B\'usqueda binaria acotada en $2\varepsilon = 64$ elementos: $O(\log 64) = O(6)$
+\end{enumerate}
+La complejidad total de b\'usqueda es $O(\log S + \log B) \approx O(18 + 6) = O(24)$ comparaciones.
+
+\subsection{Paralelismo Multihilo (Optimizaci\'on B)}
+Las 10,000 consultas se dividen equitativamente entre $T$ hilos concurrentes mediante \texttt{std::thread}. Cada hilo ejecuta sus consultas de forma independiente sobre la estructura de datos compartida (solo lectura). Se mide el tiempo total de ejecuci\'on paralela y se calcula el \textit{speedup} como:
+\begin{equation}
+    \text{Speedup}(T) = \frac{t_{\text{secuencial}}}{t_{\text{paralelo}}(T)}
+\end{equation}
+
+\subsection{Pruebas Estad\'isticas}
+Se aplicaron pruebas no param\'etricas sobre las 10,000 latencias individuales emparejadas \cite{friedman1937, wilcoxon1945}:
+\begin{itemize}
+    \item \textbf{Prueba de Friedman:} Para evaluar diferencias globales entre las 5 estructuras.
+    \item \textbf{Prueba de Wilcoxon:} Para comparaciones por pares espec\'ificos.
+\end{itemize}
+
+\section{Resultados Experimentales}
+
+\subsection{Rendimiento Secuencial}
+
+\begin{table}[h]
+\centering
+\caption{Latencias de B\'usqueda Secuencial (10,000 Consultas)}
+\label{tab:resultados}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Estructura} & \textbf{Construc.} & \textbf{Latencia} & \textbf{Ganancia} \\
+ & \textbf{(ms)} & \textbf{($\mu$s)} & \textbf{vs B* Trad.} \\
+\midrule
+\'Arbol B* (Trad.) & 151.97 & 0.604 & Baseline \\
+\'Arbol B* + ML & 68.55 & 0.404 & +33.1\% \\
+Skip List (Trad.) & 335.52 & 3.028 & -401.4\% \\
+Skip List + ML & 267.75 & 2.241 & -271.1\% \\
+\textbf{Segmentado $\varepsilon$} & \textbf{21.10} & \textbf{0.571} & \textbf{+5.4\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El \'indice segmentado $\varepsilon$-acotado logra una latencia de b\'usqueda de \textbf{0.571 $\mu$s}, comparable al \'Arbol B* tradicional (0.604 $\mu$s), con una mejora del 5.4\%. Su principal ventaja radica en el \textbf{tiempo de construcci\'on: 21.10 ms}, que es \textbf{7.2 veces m\'as r\'apido} que el \'Arbol B* tradicional (151.97 ms). Esto se debe a que la segmentaci\'on por bloques fijos opera en $O(N)$ con una sola pasada, sin necesidad de construir una jerarqu\'ia de nodos.
+
+El \'Arbol B* + ML (RMI) mantiene el mejor rendimiento de b\'usqueda secuencial (0.404 $\mu$s), gracias a que su predicci\'on de 2 etapas reduce el espacio de b\'usqueda a $\pm 70$ registros.
+
+\subsection{Rendimiento Paralelo}
+
+\begin{table}[h]
+\centering
+\caption{Aceleraci\'on por Paralelismo del \'Indice Segmentado}
+\label{tab:paralelo}
+\begin{tabular}{cccc}
+\toprule
+\textbf{Hilos} & \textbf{Tiempo (ms)} & \textbf{Speedup} & \textbf{QPS} \\
+\midrule
+1 & 6.864 & 1.00x & 1,456,893 \\
+2 & 3.576 & 1.92x & 2,796,107 \\
+4 & 2.018 & 3.40x & 4,954,173 \\
+8 & 1.668 & 4.12x & 6,001,320 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La paralelizaci\'on con 8 hilos logra un \textit{speedup} de \textbf{4.12x} sobre la ejecuci\'on secuencial, alcanzando una tasa de \textbf{6 millones de consultas por segundo (QPS)}. El speedup sub-lineal se explica por la contenci\'on de ancho de banda del bus de memoria (memory bandwidth bottleneck), dado que todas las consultas acceden al mismo arreglo de datos en memoria compartida.
+
+\subsection{Significancia Estad\'istica}
+
+\begin{table}[h]
+\centering
+\caption{Resultados de las Pruebas de Hip\'otesis ($\alpha = 0.05$)}
+\label{tab:stats}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Prueba} & \textbf{Estad\'istico} & \textbf{p-value} \\
+\midrule
+Friedman (5 grupos) & $\chi^2 = 33{,}785.42$ & $< 0.001$ \\
+Wilcoxon: B* Trad vs B* ML & $W = 2{,}083{,}343$ & $< 0.001$ \\
+Wilcoxon: Skip Trad vs ML & $W = 10{,}167{,}243$ & $< 0.001$ \\
+Wilcoxon: B* ML vs Segm. & $W = 2{,}941{,}619$ & $< 0.001$ \\
+Wilcoxon: B* Trad vs Segm. & $W = 12{,}407{,}074$ & $2.2 \times 10^{-42}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Todas las comparaciones resultan estad\'isticamente significativas ($p < 0.001$), confirmando que las diferencias observadas no son producto del ruido experimental.
+
+\section{Discusi\'on}
+
+El \'indice segmentado $\varepsilon$-acotado ofrece un balance \'optimo entre simplicidad, velocidad de construcci\'on y rendimiento de b\'usqueda. Aunque el RMI de 2 etapas logra la menor latencia secuencial, el \'indice segmentado presenta tres ventajas cr\'iticas para entornos de producci\'on:
+
+\begin{enumerate}
+    \item \textbf{Construcci\'on 7x m\'as r\'apida:} 21 ms vs. 152 ms. En sistemas que reindexan frecuentemente, esto reduce significativamente el tiempo de inactividad.
+    \item \textbf{Sin entrenamiento externo:} A diferencia del RMI que requiere un paso previo de entrenamiento en Python, el \'indice segmentado se construye enteramente en C++ durante el arranque.
+    \item \textbf{Paralelizable:} Al ser una estructura de solo lectura basada en un arreglo contiguo, escala eficientemente con el n\'umero de n\'ucleos del procesador.
+\end{enumerate}
+
+La Skip List con ML muestra una mejora del 26\% frente a su versi\'on tradicional, demostrando que la determinaci\'on de saltos guiada por la CDF es superior al azar probabilista, aunque ambas variantes son significativamente m\'as lentas que las estructuras basadas en arreglos debido a su patr\'on de acceso a memoria no secuencial.
+
+\section{Conclusiones}
+
+Este estudio demuestra que:
+\begin{enumerate}
+    \item Los \textit{Learned Indexes} basados en regresiones lineales superan consistentemente a las estructuras jer\'arquicas tradicionales en velocidad de b\'usqueda sobre datos est\'aticos.
+    \item La segmentaci\'on $\varepsilon$-acotada ofrece garant\'ias formales de error m\'aximo y se construye en una sola pasada $O(N)$, haci\'endola viable para reindexaci\'on frecuente en producci\'on.
+    \item La paralelizaci\'on multihilo escala eficientemente, alcanzando 6 millones de QPS con 8 hilos sobre 13.3 millones de registros.
+    \item Todas las mejoras reportadas son estad\'isticamente significativas ($p < 0.001$) seg\'un las pruebas de Friedman y Wilcoxon.
+\end{enumerate}
+
+Como trabajo futuro, se propone explorar la integraci\'on de \'indices segmentados din\'amicos que soporten inserciones y eliminaciones en l\'inea, as\'i como la evaluaci\'on de instrucciones SIMD (AVX-2) para vectorizar la b\'usqueda binaria local.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

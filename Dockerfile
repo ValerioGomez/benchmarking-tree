@@ -14,7 +14,7 @@ WORKDIR /app
 COPY src/ ./src/
 
 # Compilar el ejecutable principal en C++17 con optimización de nivel 3 (-O3)
-RUN g++ -O3 -std=c++17 src/main.cpp src/indexer/csv_indexer.cpp -o benchmark_indexes
+RUN g++ -O3 -std=c++17 src/main.cpp -o benchmark_indexes
 
 # Definir puntos de montaje de volúmenes para vincular la data del host y los reportes
 VOLUME ["/app/data", "/app/analysis"]

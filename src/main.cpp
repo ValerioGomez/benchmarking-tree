@@ -61,7 +61,7 @@ void exportResults(const string& path, const string& name, const Stats& s, bool 
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     cout << "==========================================================" << endl;
     cout << "  BENCHMARKING DE INDICES APRENDIDOS VS ESTRUCTURAS TRADICIONALES" << endl;
     cout << "  Doctorado en Ciencias de la Computacion - UNA" << endl;
@@ -72,6 +72,85 @@ int main() {
     string modelPath = "data/model_coefficients.txt";
     string resultsPath = "analysis/benchmark_results.json";
 
+    // Modo búsqueda de ID individual si se proporciona argumento
+    if (argc > 1) {
+        uint64_t targetId = 0;
+        try {
+            targetId = stoull(argv[1]);
+        } catch (...) {
+            cerr << "[Main] Error: El argumento proporcionado no es un ID valido." << endl;
+            return 1;
+        }
+
+        cout << "[Main] Iniciando busqueda individual para ID: " << targetId << "..." << endl;
+
+        // Cargar el índice binario
+        vector<IndexEntry> entries = CSVIndexer::loadIndex(indexPath);
+        if (entries.empty()) {
+            cerr << "[Main] Error al cargar el indice binario." << endl;
+            return 1;
+        }
+
+        sort(entries.begin(), entries.end(), [](const IndexEntry& a, const IndexEntry& b) {
+            return a.id < b.id;
+        });
+
+        // 1. Árbol B* Tradicional
+        BStarTreeTraditional<uint64_t, uint64_t, 255> bStarTrad;
+        bStarTrad.buildBottomUp(entries);
+        uint64_t offsetBStar = bStarTrad.search(targetId);
+
+        // 2. Árbol B* + ML
+        BStarTreeML bStarML;
+        if (!bStarML.loadModelsAndData(modelPath, entries)) {
+            cerr << "[Main] Error al inicializar los modelos ML del Arbol B*" << endl;
+            return 1;
+        }
+        uint64_t offsetBStarML = bStarML.search(targetId);
+
+        // 3. Skip List Tradicional
+        SkipListTraditional skipTrad(16);
+        skipTrad.build(entries);
+        uint64_t offsetSkip = skipTrad.search(targetId);
+
+        // 4. Skip List + ML
+        SkipListML skipML(16);
+        if (!skipML.loadModel(modelPath)) {
+            cerr << "[Main] Error al cargar el modelo de Skip List ML." << endl;
+            return 1;
+        }
+        skipML.build(entries);
+        uint64_t offsetSkipML = skipML.search(targetId);
+
+        cout << "\n==============================================" << endl;
+        cout << "  RESULTADOS DE BUSQUEDA PARA EL ID: " << targetId << endl;
+        cout << "==============================================" << endl;
+        cout << "1. Arbol B* Tradicional:  Offset = " << offsetBStar << endl;
+        cout << "2. Arbol B* + ML (RMI):   Offset = " << offsetBStarML << endl;
+        cout << "3. Skip List Tradicional: Offset = " << offsetSkip << endl;
+        cout << "4. Skip List + ML:        Offset = " << offsetSkipML << endl;
+        cout << "==============================================" << endl;
+
+        if (offsetBStar != 0) {
+            ifstream csvFile(csvPath, ios::binary);
+            if (csvFile.is_open()) {
+                csvFile.seekg(offsetBStar);
+                string csvLine;
+                if (getline(csvFile, csvLine)) {
+                    cout << "\n[CSV] Registro fisico encontrado:" << endl;
+                    cout << ">> " << csvLine << endl;
+                }
+                csvFile.close();
+            } else {
+                cerr << "[Main] Error: No se pudo abrir el archivo CSV para leer la linea fisica." << endl;
+            }
+        } else {
+            cout << "\n[CSV] El ID " << targetId << " no existe en el dataset." << endl;
+        }
+        return 0;
+    }
+
+    // Código por defecto si no hay argumentos (Benchmark de 10,000 consultas)
     // 1. Cargar el índice binario en memoria
     auto startLoad = chrono::high_resolution_clock::now();
     vector<IndexEntry> entries = CSVIndexer::loadIndex(indexPath);
@@ -258,6 +337,71 @@ int main() {
         cout << "[Main] Latencias individuales exportadas a: " << latenciesPath << " para pruebas estadisticas." << endl;
     } else {
         cerr << "[Main] Error: No se pudo crear el archivo de latencias en: " << latenciesPath << endl;
+    }
+
+    // ==========================================================
+    // MODO INTERACTIVO (CONSULTAS DE ID INDIVIDUALES DESDE EL CÓDIGO)
+    // ==========================================================
+    cout << "\n==========================================================" << endl;
+    cout << "  CONSULTAS INTERACTIVAS DESDE EL CODIGO" << endl;
+    cout << "==========================================================" << endl;
+    cout << "[Interactive] Desea buscar IDs especificos? (s/n): ";
+    char choice;
+    if (cin >> choice && (choice == 's' || choice == 'S')) {
+        while (true) {
+            cout << "\n[Interactive] Ingrese el ID a buscar (o 0 para salir): ";
+            uint64_t targetId;
+            if (!(cin >> targetId) || targetId == 0) {
+                break;
+            }
+
+            // 1. Árbol B* Tradicional
+            auto t1 = chrono::high_resolution_clock::now();
+            uint64_t offsetBStar = bStarTrad.search(targetId);
+            auto t2 = chrono::high_resolution_clock::now();
+            chrono::duration<double, nano> d1 = t2 - t1;
+
+            // 2. Árbol B* + ML
+            auto t3 = chrono::high_resolution_clock::now();
+            uint64_t offsetBStarML = bStarML.search(targetId);
+            auto t4 = chrono::high_resolution_clock::now();
+            chrono::duration<double, nano> d2 = t4 - t3;
+
+            // 3. Skip List Tradicional
+            auto t5 = chrono::high_resolution_clock::now();
+            uint64_t offsetSkip = skipTrad.search(targetId);
+            auto t6 = chrono::high_resolution_clock::now();
+            chrono::duration<double, nano> d3 = t6 - t5;
+
+            // 4. Skip List + ML
+            auto t7 = chrono::high_resolution_clock::now();
+            uint64_t offsetSkipML = skipML.search(targetId);
+            auto t8 = chrono::high_resolution_clock::now();
+            chrono::duration<double, nano> d4 = t8 - t7;
+
+            cout << "\n----------------------------------------------------------" << endl;
+            cout << "  RESULTADOS DE BUSQUEDA EN NANOSEGUNDOS (ns) PARA ID: " << targetId << endl;
+            cout << "----------------------------------------------------------" << endl;
+            cout << "1. Arbol B* Tradicional:  Offset = " << offsetBStar << " | Tiempo = " << d1.count() << " ns" << endl;
+            cout << "2. Arbol B* + ML (RMI):   Offset = " << offsetBStarML << " | Tiempo = " << d2.count() << " ns" << endl;
+            cout << "3. Skip List Tradicional: Offset = " << offsetSkip << " | Tiempo = " << d3.count() << " ns" << endl;
+            cout << "4. Skip List + ML:        Offset = " << offsetSkipML << " | Tiempo = " << d4.count() << " ns" << endl;
+            cout << "----------------------------------------------------------" << endl;
+
+            if (offsetBStar != 0) {
+                ifstream csvFile(csvPath, ios::binary);
+                if (csvFile.is_open()) {
+                    csvFile.seekg(offsetBStar);
+                    string csvLine;
+                    if (getline(csvFile, csvLine)) {
+                        cout << "[CSV] Registro: " << csvLine << endl;
+                    }
+                    csvFile.close();
+                }
+            } else {
+                cout << "[CSV] El ID " << targetId << " no existe en el dataset." << endl;
+            }
+        }
     }
 
     return 0;

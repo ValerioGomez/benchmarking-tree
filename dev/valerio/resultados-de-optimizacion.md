@@ -28,7 +28,7 @@ donde $K$ es la cantidad de elementos en el segmento del modelo, $X_i$ es la cla
 
 ### C. Skip List + ML ( CDF-Height Assignment )
 En la Skip List + ML, el modelo de regresión lineal global estima la posición relativa de cada clave en el conjunto ordenado. Esta posición estimada se transforma deterministamente en la altura del nodo:
-$$\text{altura} = \max\left(1, \text{log}_4(\text{pred\_idx})\right)$$
+$$\text{altura} = \max\left(1, \text{log}_4(\text{pred-index})\right)$$
 Esto sustituye la asignación probabilística clásica de la Skip List por niveles de saltos deterministas y balanceados que reflejan la distribución real de las claves en el disco.
 
 ---
@@ -36,7 +36,7 @@ Esto sustituye la asignación probabilística clásica de la Skip List por nivel
 ## 🛠️ 2. Metodología de las Optimizaciones Implementadas
 
 ### A. Optimización del Árbol B* + ML (RMI Optimizado)
-1. **Division-Free RMI:** Las divisiones flotantes son costosas en CPU ($\sim$15 ciclos). Pre-calculamos el multiplicador inverso flotante $\text{invN\_M} = M / N$ en tiempo de inicialización. Durante la búsqueda, el submodelo se selecciona instantáneamente con una multiplicación flotante: $j = \lfloor \text{pred}_1 \cdot \text{invN\_M} \rfloor$.
+1. **Division-Free RMI:** Las divisiones flotantes son costosas en CPU ($\sim$15 ciclos). Pre-calculamos el multiplicador inverso flotante $\text{invN-M} = M / N$ en tiempo de inicialización. Durante la búsqueda, el submodelo se selecciona instantáneamente con una multiplicación flotante: $j = \lfloor \text{pred}_1 \cdot \text{invN-M} \rfloor$.
 2. **Búsqueda Local Branchless:** Rediseñamos el bucle de búsqueda binaria final para evitar saltos condicionales en el pipeline de la CPU. La actualización del puntero se realiza con asignaciones condicionales que el compilador traduce directamente a instrucciones de ensamblador hardware `CMOV` (Conditional Move), eliminando las penalizaciones por fallos en la predicción de saltos.
 
 ### B. Optimización de la Skip List + ML (Landmarks)
